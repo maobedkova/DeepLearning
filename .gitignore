@@ -1,0 +1,9 @@
+*/logs/*
+.idea/*
+*/gym_cartpole/*
+*.txt
+*.zip
+*.npz
+*.png
+*.gz
+*.LICENSE
