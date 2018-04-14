@@ -71,74 +71,65 @@ class Network:
             self.labels = tf.placeholder(tf.int64, [None], name="labels")
             self.is_training = tf.placeholder(tf.bool, [], name="is_training")
 
-            # TODO: Computation and training.
-            #
             # The code below assumes that:
             # - loss is stored in `self.loss`
             # - training is stored in `self.training`
             # - label predictions are stored in `self.predictions`
 
             # I
-            features = tf.nn.conv3d(self.voxels,
-                                    filter=tf.get_variable(shape=[5, 5, 5, 1, 32], dtype=tf.float32, name='filter1'),
-                                    strides=[1, 2, 2, 2, 1],
-                                    padding="SAME")
-
-            # features = tf.nn.relu(tf.layers.batch_normalization(features, training=self.is_training))
+            features = tf.layers.conv3d(self.voxels,
+                                        filters=32,
+                                        kernel_size=5,
+                                        strides=2,
+                                        padding="same",
+                                        activation=tf.nn.relu)
 
             # II
-            features = tf.nn.conv3d(features,
-                                    filter=tf.get_variable(shape=[3, 3, 3, 32, 32], dtype=tf.float32, name='filter2'),
-                                    strides=[1, 1, 1, 1, 1],
-                                    padding="SAME")
+            features = tf.layers.conv3d(features,
+                                        filters=32,
+                                        kernel_size=3,
+                                        strides=1,
+                                        padding="same",
+                                        activation=tf.nn.relu)
 
-            # features = tf.nn.relu(tf.layers.batch_normalization(features, training=self.is_training))
-
-            features = tf.nn.max_pool3d(features,
-                                        ksize=[1, 2, 2, 2, 1],
-                                        strides=[1, 1, 1, 1, 1],
-                                        padding='SAME')
+            features = tf.layers.max_pooling3d(features,
+                                               pool_size=2,
+                                               strides=1)
 
             # III
-            features = tf.nn.conv3d(features,
-                                    filter=tf.get_variable(shape=[5, 5, 5, 32, 128], dtype=tf.float32, name='filter3'),
-                                    strides=[1, 1, 1, 1, 1],
-                                    padding="SAME")
+            features = tf.layers.conv3d(features,
+                                        filters=128,
+                                        kernel_size=3,
+                                        strides=1,
+                                        padding="same",
+                                        activation=tf.nn.relu)
 
-            # features = tf.nn.relu(tf.layers.batch_normalization(features, training=self.is_training))
-
-            features = tf.nn.max_pool3d(features,
-                                        ksize=[1, 2, 2, 2, 1],
-                                        strides=[1, 1, 1, 1, 1],
-                                        padding='SAME')
+            features = tf.layers.max_pooling3d(features,
+                                               pool_size=2,
+                                               strides=1)
 
             # Final
             features = tf.layers.flatten(features, name="flatten")
-
-            dropout = 0.3
-            # features = tf.layers.dropout(features,
-            #                              rate=dropout,
-            #                              training=self.is_training,
-            #                              name="dropout_layer")
-
             output_layer = tf.layers.dense(features, self.LABELS, activation=None, name="output_layer")
+
             self.predictions = tf.argmax(output_layer, axis=1)
 
             self.loss = tf.losses.sparse_softmax_cross_entropy(self.labels, output_layer, scope="loss")
+
             global_step = tf.train.create_global_step()
 
-            # start_learn_rate = 0.005
-            # final_learn_rate = 0.000005
-            # batches_per_epoch = train.num_examples // args.batch_size
-            # decay_rate = np.power(final_learn_rate / start_learn_rate, 1 / (args.epochs - 1))
-            # self.learning_rate = tf.train.exponential_decay(start_learn_rate,
-            #                                                 global_step,
-            #                                                 batches_per_epoch,
-            #                                                 decay_rate, staircase=True)
-            #
-            # updated_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-            # with tf.control_dependencies(updated_ops):
-            self.training = tf.train.AdamOptimizer().minimize(self.loss, global_step=global_step, name="training")
+            start_learn_rate = 0.005
+            final_learn_rate = 0.0005
+            batches_per_epoch = len(train.labels) // args.batch_size
+            decay_rate = np.power(final_learn_rate / start_learn_rate, 1 / (args.epochs - 1))
+            self.learning_rate = tf.train.exponential_decay(start_learn_rate,
+                                                            global_step,
+                                                            batches_per_epoch,
+                                                            decay_rate, staircase=True)
+
+            self.training = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss,
+                                                                                global_step=global_step,
+                                                                                name="training")
 
             # Summaries
             self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.labels, self.predictions), tf.float32))
@@ -193,9 +184,9 @@ if __name__ == "__main__":
 
     # Parse arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size", default=32, type=int, help="Batch size.")
-    parser.add_argument("--epochs", default=1, type=int, help="Number of epochs.")
-    parser.add_argument("--modelnet_dim", default=32, type=int, help="Dimension of ModelNet data.")
+    parser.add_argument("--batch_size", default=40, type=int, help="Batch size.")
+    parser.add_argument("--epochs", default=5, type=int, help="Number of epochs.")
+    parser.add_argument("--modelnet_dim", default=20, type=int, help="Dimension of ModelNet data.")
     parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
     parser.add_argument("--train_split", default=0.8, type=float, help="Ratio of examples to use as train.")
     args = parser.parse_args()
@@ -218,10 +209,16 @@ if __name__ == "__main__":
 
     # Train
     for i in range(args.epochs):
+        print(">Epoch:",  i + 1)
         while not train.epoch_finished():
             voxels, labels = train.next_batch(args.batch_size)
             network.train_batch(voxels, labels)
-        print(network.evaluate("dev", dev, args.batch_size))
+            acc = network.evaluate("dev", dev, args.batch_size)
+            print(acc)
+
+        acc = network.evaluate("dev", dev, args.batch_size)
+        print("Acc:{:.4f}".format(acc))
+        print("=" * 30)
 
     # Predict test data
     with open("{}/3d_recognition_test.txt".format(args.logdir), "w") as test_file:
