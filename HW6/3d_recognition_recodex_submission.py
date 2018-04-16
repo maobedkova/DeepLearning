@@ -1,12 +1,14 @@
-#!/usr/bin/env python3
+# coding=utf-8
+
+source_1 = """#!/usr/bin/env python3
 import numpy as np
 import tensorflow as tf
 
 class Dataset:
     def __init__(self, filename, shuffle_batches = True):
         data = np.load(filename)
-        self._voxels = data["voxels"]
-        self._labels = data["labels"] if "labels" in data else None
+        self._voxels = data[\"voxels\"]
+        self._labels = data[\"labels\"] if \"labels\" in data else None
 
         self._shuffle_batches = shuffle_batches
         self._new_permutation()
@@ -67,9 +69,9 @@ class Network:
         with self.session.graph.as_default():
             # Inputs
             self.voxels = tf.placeholder(
-                tf.float32, [None, args.modelnet_dim, args.modelnet_dim, args.modelnet_dim, 1], name="voxels")
-            self.labels = tf.placeholder(tf.int64, [None], name="labels")
-            self.is_training = tf.placeholder(tf.bool, [], name="is_training")
+                tf.float32, [None, args.modelnet_dim, args.modelnet_dim, args.modelnet_dim, 1], name=\"voxels\")
+            self.labels = tf.placeholder(tf.int64, [None], name=\"labels\")
+            self.is_training = tf.placeholder(tf.bool, [], name=\"is_training\")
 
             # The code below assumes that:
             # - loss is stored in `self.loss`
@@ -81,7 +83,7 @@ class Network:
                                         filters=32,
                                         kernel_size=5,
                                         strides=2,
-                                        padding="same",
+                                        padding=\"same\",
                                         activation=tf.nn.relu)
 
             # II
@@ -89,7 +91,7 @@ class Network:
                                         filters=32,
                                         kernel_size=3,
                                         strides=1,
-                                        padding="same",
+                                        padding=\"same\",
                                         activation=tf.nn.relu)
 
             features = tf.layers.max_pooling3d(features,
@@ -101,7 +103,7 @@ class Network:
                                         filters=128,
                                         kernel_size=3,
                                         strides=1,
-                                        padding="same",
+                                        padding=\"same\",
                                         activation=tf.nn.relu)
 
             features = tf.layers.max_pooling3d(features,
@@ -109,12 +111,12 @@ class Network:
                                                strides=1)
 
             # Final
-            features = tf.layers.flatten(features, name="flatten")
-            output_layer = tf.layers.dense(features, self.LABELS, activation=None, name="output_layer")
+            features = tf.layers.flatten(features, name=\"flatten\")
+            output_layer = tf.layers.dense(features, self.LABELS, activation=None, name=\"output_layer\")
 
             self.predictions = tf.argmax(output_layer, axis=1)
 
-            self.loss = tf.losses.sparse_softmax_cross_entropy(self.labels, output_layer, scope="loss")
+            self.loss = tf.losses.sparse_softmax_cross_entropy(self.labels, output_layer, scope=\"loss\")
 
             global_step = tf.train.create_global_step()
 
@@ -129,21 +131,21 @@ class Network:
 
             self.training = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss,
                                                                                 global_step=global_step,
-                                                                                name="training")
+                                                                                name=\"training\")
 
             # Summaries
             self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.labels, self.predictions), tf.float32))
             summary_writer = tf.contrib.summary.create_file_writer(args.logdir, flush_millis=10 * 1000)
             self.summaries = {}
             with summary_writer.as_default(), tf.contrib.summary.record_summaries_every_n_global_steps(8):
-                self.summaries["train"] = [tf.contrib.summary.scalar("train/loss", self.loss),
-                                           tf.contrib.summary.scalar("train/accuracy", self.accuracy)]
+                self.summaries[\"train\"] = [tf.contrib.summary.scalar(\"train/loss\", self.loss),
+                                           tf.contrib.summary.scalar(\"train/accuracy\", self.accuracy)]
             with summary_writer.as_default(), tf.contrib.summary.always_record_summaries():
-                self.given_loss = tf.placeholder(tf.float32, [], name="given_loss")
-                self.given_accuracy = tf.placeholder(tf.float32, [], name="given_accuracy")
-                for dataset in ["dev", "test"]:
-                    self.summaries[dataset] = [tf.contrib.summary.scalar(dataset + "/loss", self.given_loss),
-                                               tf.contrib.summary.scalar(dataset + "/accuracy", self.given_accuracy)]
+                self.given_loss = tf.placeholder(tf.float32, [], name=\"given_loss\")
+                self.given_accuracy = tf.placeholder(tf.float32, [], name=\"given_accuracy\")
+                for dataset in [\"dev\", \"test\"]:
+                    self.summaries[dataset] = [tf.contrib.summary.scalar(dataset + \"/loss\", self.given_loss),
+                                               tf.contrib.summary.scalar(dataset + \"/accuracy\", self.given_accuracy)]
 
             # Initialize variables
             self.session.run(tf.global_variables_initializer())
@@ -151,7 +153,7 @@ class Network:
                 tf.contrib.summary.initialize(session=self.session, graph=self.session.graph)
 
     def train_batch(self, images, labels):
-        self.session.run([self.training, self.summaries["train"]], {self.voxels: voxels, self.labels: labels, self.is_training: True})
+        self.session.run([self.training, self.summaries[\"train\"]], {self.voxels: voxels, self.labels: labels, self.is_training: True})
 
     def evaluate(self, dataset_name, dataset, batch_size):
         loss, accuracy = 0, 0
@@ -173,7 +175,7 @@ class Network:
             labels.append(self.session.run(self.predictions, {self.voxels: voxels, self.is_training: False}))
         return np.concatenate(labels)
 
-if __name__ == "__main__":
+if __name__ == \"__main__\":
     import argparse
     import datetime
     import os
@@ -184,24 +186,24 @@ if __name__ == "__main__":
 
     # Parse arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size", default=40, type=int, help="Batch size.")
-    parser.add_argument("--epochs", default=3, type=int, help="Number of epochs.")
-    parser.add_argument("--modelnet_dim", default=20, type=int, help="Dimension of ModelNet data.")
-    parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
-    parser.add_argument("--train_split", default=0.8, type=float, help="Ratio of examples to use as train.")
+    parser.add_argument(\"--batch_size\", default=40, type=int, help=\"Batch size.\")
+    parser.add_argument(\"--epochs\", default=2, type=int, help=\"Number of epochs.\")
+    parser.add_argument(\"--modelnet_dim\", default=20, type=int, help=\"Dimension of ModelNet data.\")
+    parser.add_argument(\"--threads\", default=1, type=int, help=\"Maximum number of threads to use.\")
+    parser.add_argument(\"--train_split\", default=0.8, type=float, help=\"Ratio of examples to use as train.\")
     args = parser.parse_args()
 
     # Create logdir name
-    args.logdir = "logs/{}-{}-{}".format(
+    args.logdir = \"logs/{}-{}-{}\".format(
         os.path.basename(__file__),
-        datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"),
-        ",".join(("{}={}".format(re.sub("(.)[^_]*_?", r"\1", key), value) for key, value in sorted(vars(args).items())))
+        datetime.datetime.now().strftime(\"%Y-%m-%d_%H%M%S\"),
+        \",\".join((\"{}={}\".format(re.sub(\"(.)[^_]*_?\", r\"\\1\", key), value) for key, value in sorted(vars(args).items())))
     )
-    if not os.path.exists("logs"): os.mkdir("logs") # TF 1.6 will do this by itself
+    if not os.path.exists(\"logs\"): os.mkdir(\"logs\") # TF 1.6 will do this by itself
 
     # Load the data
-    train, dev = Dataset("modelnet{}-train.npz".format(args.modelnet_dim)).split(args.train_split)
-    test = Dataset("modelnet{}-test.npz".format(args.modelnet_dim), shuffle_batches=False)
+    train, dev = Dataset(\"modelnet{}-train.npz\".format(args.modelnet_dim)).split(args.train_split)
+    test = Dataset(\"modelnet{}-test.npz\".format(args.modelnet_dim), shuffle_batches=False)
 
     # Construct the network
     network = Network(threads=args.threads)
@@ -209,19 +211,32 @@ if __name__ == "__main__":
 
     # Train
     for i in range(args.epochs):
-        print(">Epoch:",  i + 1)
+        print(\">Epoch:\",  i + 1)
         while not train.epoch_finished():
             voxels, labels = train.next_batch(args.batch_size)
             network.train_batch(voxels, labels)
-            # acc = network.evaluate("dev", dev, args.batch_size)
+            # acc = network.evaluate(\"dev\", dev, args.batch_size)
             # print(acc)
 
-        acc = network.evaluate("dev", dev, args.batch_size)
-        # print("Acc:{:.4f}".format(acc))
-        # print("=" * 30)
+        acc = network.evaluate(\"dev\", dev, args.batch_size)
+        # print(\"Acc:{:.4f}\".format(acc))
+        # print(\"=\" * 30)
 
     # Predict test data
-    with open("{}/3d_recognition_test.txt".format(args.logdir), "w") as test_file:
+    with open(\"{}/3d_recognition_test.txt\".format(args.logdir), \"w\") as test_file:
         labels = network.predict(test, args.batch_size)
         for label in labels:
             print(label, file=test_file)
+"""
+
+test_data = b'{Wp48S^xk9=GL@E0stWa761SMbT8$j;0mJxhg|>|gFQ{NIp$)Q<I~M*%_ymjv>aVJcvTI=HwU{RsLbEW{K2E~_zw8GaiG6M#nuSdhS6<u&>DW)L8VH_T7iO8y5sv-zfE%lR)5)r0I%=JMI4KX?sE#FGPU8NdQCUEz^Mn~Hi-#*SwVhwq3{G|B{X<B#S-=~_7g;qv|xdijZm`J?xvq~VxX50De#jO?s_*lIY@#&h@htoe(!pG58+!m0G0H5OMN^R9+9=tFT~UIS3~#f=Rc;p?MI4DfFdCN<tc&%)k*phM@%yo#Wb{$17OFbqE(AwJd`~!ys;~-kxsdD{SGAN$mDFITmf#qt62IQ<BeS`w!_KTqAVbUu$xY;oLE3I=NhzIMBRBn4)g2JAe@yeVok_vBN9|hg-!|KpQnwUYA&IsMHvv|dRG?!IM3R5R>BJRMq$z52QG?cCUf<%Imt2t=TM_+XTAq3xT-+ZWHj#hvULx8S3y-n;ysF7D5}3Z)JtVH&^~NQ(bOn(>QC~0jJY!*u8Lr<++iT(JX-6tXc|94Mf_6zv6z}nB!o+L8yX3e20dEH?Xf<}cqgAZ3+Lu`vBMd(uIXEaf<U)7J(y8XvpQ{^JRk!&CM>Nl2AP&TjpoD@CD&YG%)v<-0VrLr&6M&o@UsfLs5myQ6xN$vQ4mJ?{E(?q7tT}FzhNvP2h=~?Un=r-lj*{;IkD@@*F+e@z5R37WLn;Du<Uq(!nuxTaCgE3>KT(9aKmRt6mLI+U}&%USgwgEkRY8ooeyb{9i4oi>ZB?!GK*`*;$k);4D75kL!sz%lb-QJm!qT2MHufaOW}X6DdDsIcgv{I=vA^&Oh9FKwU<mmI!pinUDC2qWuLz%00E-~q!j=FB-hzYvBYQl0ssI200dcD'
+
+if __name__ == "__main__":
+    import base64
+    import io
+    import lzma
+    import sys
+
+    with io.BytesIO(base64.b85decode(test_data)) as lzma_data:
+        with lzma.open(lzma_data, "r") as lzma_file:
+            sys.stdout.buffer.write(lzma_file.read())

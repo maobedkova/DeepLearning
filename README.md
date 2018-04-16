@@ -25,3 +25,7 @@ Homework for Deep Learning class of Charles University.
 
 - **mnist_batchnorm**: batch normalization
 - **fashion_masks**: image segmentation (pixel bit mask generation)
+
+### HW6
+
+- **3d_recognition**: recognition of 3D objects
