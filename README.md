@@ -29,3 +29,7 @@ Homework for Deep Learning class of Charles University.
 ### HW6
 
 - **3d_recognition**: recognition of 3D objects
+
+### HW7
+
+- **nsketch_transfer**: transfer learning
