@@ -34,3 +34,4 @@ Homework for Deep Learning class of Charles University.
 
 - **nsketch_transfer**: transfer learning
 - **sequence_classification**: RNN modeling, RNN, LSTM, GRU cells, exploding gradient, gradient clipping
+- **sequence_prediction**: low-level handling of RNN cells (dimensionality, type), mean squared error 
