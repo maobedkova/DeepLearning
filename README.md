@@ -33,3 +33,4 @@ Homework for Deep Learning class of Charles University.
 ### HW7
 
 - **nsketch_transfer**: transfer learning
+- **sequence_classification**: RNN modeling, RNN, LSTM, GRU cells, exploding gradient, gradient clipping
