@@ -39,6 +39,7 @@ class Dataset:
 
 class Network:
     WIDTH, HEIGHT = 224, 224
+    LABELS = 250
 
     def __init__(self, threads, seed=42):
         # Create an empty graph and a session
@@ -57,11 +58,31 @@ class Network:
             # Create NASNet
             images = 2 * (tf.tile(tf.image.convert_image_dtype(self.images, tf.float32), [1, 1, 1, 3]) - 0.5)
             with tf.contrib.slim.arg_scope(nets.nasnet.nasnet.nasnet_mobile_arg_scope()):
-                features, _ = nets.nasnet.nasnet.build_nasnet_mobile(images, num_classes=None, is_training=False)
+                features, _ = nets.nasnet.nasnet.build_nasnet_mobile(images, num_classes=None, is_training=self.is_training)
             self.nasnet_saver = tf.train.Saver()
 
-            # TODO: Computation and training.
-            #
+            # Training
+            output_layer = tf.layers.dense(features, self.LABELS, activation=None, name="output_layer")
+
+            self.predictions = tf.argmax(output_layer, axis=1) - 1
+
+            self.loss = tf.losses.sparse_softmax_cross_entropy(self.labels, features, scope="loss")
+
+            global_step = tf.train.create_global_step()
+
+            start_learn_rate = 0.005
+            final_learn_rate = 0.0005
+            batches_per_epoch = len(train.labels) // args.batch_size
+            decay_rate = np.power(final_learn_rate / start_learn_rate, 1 / (args.epochs - 1))
+            self.learning_rate = tf.train.exponential_decay(start_learn_rate,
+                                                            global_step,
+                                                            batches_per_epoch,
+                                                            decay_rate, staircase=True)
+
+            self.training = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss,
+                                                                                global_step=global_step,
+                                                                                name="training")
+
             # The code below assumes that:
             # - loss is stored in `self.loss`
             # - training is stored in `self.training`
@@ -124,8 +145,8 @@ if __name__ == "__main__":
 
     # Parse arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size", default=None, type=int, help="Batch size.")
-    parser.add_argument("--epochs", default=None, type=int, help="Number of epochs.")
+    parser.add_argument("--batch_size", default=64, type=int, help="Batch size.")
+    parser.add_argument("--epochs", default=5, type=int, help="Number of epochs.")
     parser.add_argument("--nasnet", default="nets/nasnet/model.ckpt", type=str, help="NASNet checkpoint path.")
     parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
     args = parser.parse_args()
@@ -154,10 +175,12 @@ if __name__ == "__main__":
             images, labels = train.next_batch(args.batch_size)
             network.train_batch(images, labels)
 
-        network.evaluate("dev", dev, args.batch_size)
+        acc = network.evaluate("dev", dev, args.batch_size)
+        print(acc)
 
     # Predict test data
     with open("{}/nsketch_transfer_test.txt".format(args.logdir), "w") as test_file:
         labels = network.predict(test, args.batch_size)
         for label in labels:
+            print(label)
             print(label, file=test_file)
