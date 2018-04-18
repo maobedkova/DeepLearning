@@ -2,6 +2,7 @@
 import numpy as np
 import tensorflow as tf
 
+
 class Network:
     DATA = 144
     TEST = 40
@@ -11,36 +12,66 @@ class Network:
         # Create an empty graph and a session
         graph = tf.Graph()
         graph.seed = seed
-        self.session = tf.Session(graph = graph, config=tf.ConfigProto(inter_op_parallelism_threads=threads,
-                                                                       intra_op_parallelism_threads=threads))
+        self.session = tf.Session(graph=graph, config=tf.ConfigProto(inter_op_parallelism_threads=threads,
+                                                                     intra_op_parallelism_threads=threads))
 
     def construct(self, args):
         with self.session.graph.as_default():
             # Inputs
             self.sequence = tf.placeholder(tf.float32, [self.TRAIN], name="sequence")
 
-            # TODO: Create RNN cell according to args.rnn_cell (RNN, LSTM and GRU should be supported,
+            # Create RNN cell according to args.rnn_cell (RNN, LSTM and GRU should be supported,
             # using BasicRNNCell, BasicLSTMCell and GRUCell from tf.nn.rnn_cell module),
             # with dimensionality of args.rnn_cell_dim. Store the cell in `rnn_cell`.
 
-            state = # TODO: Create zero state using rnn_cell.zero_state call. Use batch size 1.
+            if args.rnn_cell == "RNN":
+                rnn_cell = tf.nn.rnn_cell.BasicRNNCell(num_units=args.rnn_cell_dim, name="rnn_cell")
+            elif args.rnn_cell == "LSTM":
+                rnn_cell = tf.nn.rnn_cell.BasicLSTMCell(num_units=args.rnn_cell_dim, name="lstm_cell")
+            elif args.rnn_cell == "GRU":
+                rnn_cell = tf.nn.rnn_cell.GRUCell(num_units=args.rnn_cell_dim, name="gru_cell")
+
+            # Create zero state using rnn_cell.zero_state call. Use batch size 1.
+
+            state = rnn_cell.zero_state(batch_size=1, dtype=tf.float32)
+
             predictions, loss = [], 0
-            dense = # TODO: Create a dense layer object using tf.layers.Dense, with 1 output unit.
+
+            # Create a dense layer object using tf.layers.Dense, with 1 output unit.
+
+            dense = tf.layers.Dense(units=1, activation=None)
+
             for i in range(self.TRAIN):
-                # TODO: Call rnn_cell (the input should be 0.0 on first step and self.sequence[i - 1] otherwise).
+                # Call rnn_cell (the input should be 0.0 on first step and self.sequence[i - 1] otherwise).
                 # Note that rnn_cell assumes the input is a batch of vectors, so you need to produce the
                 # input with [1, 1] shape.
-                #
+
+                if i == 0:
+                    out, state = rnn_cell(tf.reshape(0.0, [1, 1]), state)
+                else:
+                    out, state = rnn_cell(tf.reshape(self.sequence[i - 1], [1, 1]), state)
+
                 # Then compute current prediction, by using `dense` layer, and append the scalar prediction
                 # (i.e., with shape []) to `predictions`.
-                #
+
+                current_prediction = dense(out)
+                predictions.append(tf.reshape(current_prediction, []))
+
                 # Also add mean square error of the prediction and self.sequence[i] to the loss.
 
-            for i in range(self.TEST):
-                # TODO: Call rnn_cell, the input should be the latest prediction. Generate a new
-                # prediction using the `dense` layer and append it to `predictions`.
+                loss += tf.losses.mean_squared_error(self.sequence[i], predictions[i])
 
-            # TODO: Generate `self.predictions` tensor (instead of Python list), use `tf.stack`.
+            for i in range(self.TEST):
+                # Call rnn_cell, the input should be the latest prediction. Generate a new
+                # prediction using the `dense` layer and append it to `predictions`.
+                # last_prediction = current_prediction
+                out, state = rnn_cell(tf.reshape(current_prediction, [1, 1]), state)
+                current_prediction = dense(out)
+                predictions.append(tf.reshape(current_prediction, []))
+
+            # Generate `self.predictions` tensor (instead of Python list), use `tf.stack`.
+
+            self.predictions = tf.stack(predictions)
 
             # Training
             global_step = tf.train.create_global_step()
@@ -56,7 +87,8 @@ class Network:
                 self.prediction_gold = tf.placeholder(tf.float32, [self.TEST], name="prediction_gold")
                 self.prediction_loss = tf.losses.mean_squared_error(self.prediction_gold, self.predictions[self.TRAIN:])
                 self.summaries["prediction"] = [tf.contrib.summary.scalar("prediction/loss", self.prediction_loss),
-                                                tf.contrib.summary.image("prediction", tf.expand_dims(self.prediction_image, 0))]
+                                                tf.contrib.summary.image("prediction",
+                                                                         tf.expand_dims(self.prediction_image, 0))]
 
             # Initialize variables
             self.session.run(tf.global_variables_initializer())
@@ -72,6 +104,7 @@ class Network:
     def prediction_summary(self, gold, predictions):
         min_value = min(np.min(gold), np.min(predictions))
         max_value = max(np.max(gold), np.max(predictions))
+
         def y(x):
             return int(self.DATA - 1 - (self.DATA - 1) * (x - min_value) / (max_value - min_value))
 
@@ -80,8 +113,9 @@ class Network:
             prediction_image[y(gold[i]), i] = [0, 0, 255] if i < self.TRAIN else [0, 255, 0]
             prediction_image[y(predictions[i]), i] = [255, 0, 0]
 
-        self.session.run(self.summaries["prediction"],
-                         {self.predictions: predictions, self.prediction_gold: gold[self.TRAIN:], self.prediction_image: prediction_image})
+        return self.session.run([self.prediction_loss, self.summaries["prediction"]],
+                                {self.predictions: predictions, self.prediction_gold: gold[self.TRAIN:],
+                                 self.prediction_image: prediction_image})
 
 
 if __name__ == "__main__":
@@ -109,12 +143,12 @@ if __name__ == "__main__":
         ",".join(("{}={}".format(re.sub("(.)[^_]*_?", r"\1", key), value)
                   for key, value in sorted(vars(args).items()))).replace("/", "-")
     )
-    if not os.path.exists("logs"): os.mkdir("logs") # TF 1.6 will do this by itself
+    if not os.path.exists("logs"): os.mkdir("logs")  # TF 1.6 will do this by itself
 
     # Load the data
     with open("international-airline-passengers.tsv", "r") as data_file:
         data = [float(line.split("\t")[1]) for line in data_file.readlines()[1:]]
-        assert(len(data) == Network.DATA)
+        assert (len(data) == Network.DATA)
         data = np.array(data, dtype=np.float32)
         data -= np.min(data)
         data /= np.max(data)
@@ -128,6 +162,7 @@ if __name__ == "__main__":
         for step in range(args.steps_per_epoch):
             network.train(data[:Network.TRAIN])
 
-        network.prediction_summary(data, network.predict(data[:Network.TRAIN]))
+        # Print network.prediction_loss for each epoch, using "{:.2g}" format.
 
-        # TODO: Print network.prediction_loss for each epoch, using "{:.2g}" format.
+        loss = network.prediction_summary(data, network.predict(data[:Network.TRAIN]))[0]
+        print("{:.2g}".format(loss))
