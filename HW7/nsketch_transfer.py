@@ -55,18 +55,24 @@ class Network:
             self.labels = tf.placeholder(tf.int64, [None], name="labels")
             self.is_training = tf.placeholder(tf.bool, [], name="is_training")
 
+            if self.is_training is not None:
+                is_training = True
+            else:
+                is_training = False
+
             # Create NASNet
             images = 2 * (tf.tile(tf.image.convert_image_dtype(self.images, tf.float32), [1, 1, 1, 3]) - 0.5)
             with tf.contrib.slim.arg_scope(nets.nasnet.nasnet.nasnet_mobile_arg_scope()):
-                features, _ = nets.nasnet.nasnet.build_nasnet_mobile(images, num_classes=None, is_training=self.is_training)
+                features, _ = nets.nasnet.nasnet.build_nasnet_mobile(images, num_classes=None, is_training=is_training)
             self.nasnet_saver = tf.train.Saver()
 
             # Training
-            output_layer = tf.layers.dense(features, self.LABELS, activation=None, name="output_layer")
+            with tf.variable_scope("output_layer"):
+                output_layer = tf.layers.dense(features, self.LABELS, activation=None)
 
-            self.predictions = tf.argmax(output_layer, axis=1) - 1
+            self.predictions = tf.argmax(output_layer, axis=1)
 
-            self.loss = tf.losses.sparse_softmax_cross_entropy(self.labels, features, scope="loss")
+            self.loss = tf.losses.sparse_softmax_cross_entropy(self.labels, output_layer, scope="loss")
 
             global_step = tf.train.create_global_step()
 
@@ -78,9 +84,15 @@ class Network:
                                                             global_step,
                                                             batches_per_epoch,
                                                             decay_rate, staircase=True)
+            
+                        
+            train_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
+                               scope="output_layer")
+                            
 
             self.training = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss,
                                                                                 global_step=global_step,
+                                                                                var_list=train_vars,
                                                                                 name="training")
 
             # The code below assumes that:
@@ -148,7 +160,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", default=64, type=int, help="Batch size.")
     parser.add_argument("--epochs", default=5, type=int, help="Number of epochs.")
     parser.add_argument("--nasnet", default="nets/nasnet/model.ckpt", type=str, help="NASNet checkpoint path.")
-    parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+    parser.add_argument("--threads", default=8, type=int, help="Maximum number of threads to use.")
     args = parser.parse_args()
 
     # Create logdir name
@@ -171,9 +183,12 @@ if __name__ == "__main__":
 
     # Train
     for i in range(args.epochs):
+        print("Epoch", i)
         while not train.epoch_finished():
             images, labels = train.next_batch(args.batch_size)
             network.train_batch(images, labels)
+            acc = network.evaluate("dev", dev, args.batch_size)
+            print(acc)
 
         acc = network.evaluate("dev", dev, args.batch_size)
         print(acc)
@@ -182,5 +197,5 @@ if __name__ == "__main__":
     with open("{}/nsketch_transfer_test.txt".format(args.logdir), "w") as test_file:
         labels = network.predict(test, args.batch_size)
         for label in labels:
-            print(label)
+            #print(label)
             print(label, file=test_file)
