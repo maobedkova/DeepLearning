@@ -16,7 +16,8 @@ class Dataset:
         self._labels = data["labels"] if "labels" in data else None
 
         self._shuffle_batches = shuffle_batches
-        self._permutation = np.random.permutation(len(self._images)) if self._shuffle_batches else np.arange(len(self._images))
+        self._permutation = np.random.permutation(len(self._images)) if self._shuffle_batches else np.arange(
+            len(self._images))
 
     @property
     def images(self):
@@ -33,7 +34,8 @@ class Dataset:
 
     def epoch_finished(self):
         if len(self._permutation) == 0:
-            self._permutation = np.random.permutation(len(self._images)) if self._shuffle_batches else np.arange(len(self._images))
+            self._permutation = np.random.permutation(len(self._images)) if self._shuffle_batches else np.arange(
+                len(self._images))
             return True
         return False
 
@@ -46,8 +48,8 @@ class Network:
         # Create an empty graph and a session
         graph = tf.Graph()
         graph.seed = seed
-        self.session = tf.Session(graph = graph, config=tf.ConfigProto(inter_op_parallelism_threads=threads,
-                                                                       intra_op_parallelism_threads=threads))
+        self.session = tf.Session(graph=graph, config=tf.ConfigProto(inter_op_parallelism_threads=threads,
+                                                                     intra_op_parallelism_threads=threads))
 
     def construct(self, args):
         with self.session.graph.as_default():
@@ -59,23 +61,25 @@ class Network:
             # Create NASNet
             images = 2 * (tf.tile(tf.image.convert_image_dtype(self.images, tf.float32), [1, 1, 1, 3]) - 0.5)
             with tf.contrib.slim.arg_scope(nets.nasnet.nasnet.nasnet_mobile_arg_scope()):
-                features, _ = nets.nasnet.nasnet.build_nasnet_mobile(images, num_classes=None, is_training=False)
+                features, _ = nets.nasnet.nasnet.build_nasnet_mobile(images, num_classes=None, is_training=True)
             self.nasnet_saver = tf.train.Saver()
+
+            # The code below assumes that:
+            # - loss is stored in `self.loss`
+            # - training is stored in `self.training`
+            # - label predictions are stored in `self.predictions`
 
             # Training
             with tf.variable_scope("output_layer"):
-                features = tf.layers.flatten(features)
-
+                features = tf.layers.dense(features, 2240, activation=tf.nn.relu)
                 output_layer = tf.layers.dense(features, self.LABELS, activation=None)
-
                 self.predictions = tf.argmax(output_layer, axis=1)
-
                 self.loss = tf.losses.sparse_softmax_cross_entropy(self.labels, output_layer)
 
             global_step = tf.train.create_global_step()
 
-            start_learn_rate = 0.005
-            final_learn_rate = 0.0005
+            start_learn_rate = 0.00005
+            final_learn_rate = 0.0000005
             batches_per_epoch = len(train.labels) // args.batch_size
             decay_rate = np.power(final_learn_rate / start_learn_rate, 1 / (args.epochs - 1))
             self.learning_rate = tf.train.exponential_decay(start_learn_rate,
@@ -83,19 +87,14 @@ class Network:
                                                             batches_per_epoch,
                                                             decay_rate, staircase=True)
 
-            train_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
-                                           scope="output_layer")
+            train_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="output_layer")
+
             updated_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
             with tf.control_dependencies(updated_ops):
                 self.training = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss,
-                                                                                var_list=train_vars,
-                                                                                global_step=global_step,
-                                                                                name="training")
-
-            # The code below assumes that:
-            # - loss is stored in `self.loss`
-            # - training is stored in `self.training`
-            # - label predictions are stored in `self.predictions`
+                                                                                    var_list=train_vars,
+                                                                                    global_step=global_step,
+                                                                                    name="training")
 
             # Summaries
             self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.labels, self.predictions), tf.float32))
@@ -111,6 +110,9 @@ class Network:
                     self.summaries[dataset] = [tf.contrib.summary.scalar(dataset + "/loss", self.given_loss),
                                                tf.contrib.summary.scalar(dataset + "/accuracy", self.given_accuracy)]
 
+            # Construct the saver
+            self.saver = tf.train.Saver()
+
             # Initialize variables
             self.session.run(tf.global_variables_initializer())
             with summary_writer.as_default():
@@ -119,8 +121,9 @@ class Network:
             # Load NASNet
             self.nasnet_saver.restore(self.session, args.nasnet)
 
-    def train_batch(self,  images, labels):
-        self.session.run([self.training, self.summaries["train"]], {self.images: images, self.labels: labels, self.is_training: True})
+    def train_batch(self, images, labels):
+        self.session.run([self.training, self.summaries["train"]],
+                         {self.images: images, self.labels: labels, self.is_training: True})
 
     def evaluate(self, dataset_name, dataset, batch_size):
         loss, accuracy = 0, 0
@@ -154,10 +157,10 @@ if __name__ == "__main__":
 
     # Parse arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size", default=100, type=int, help="Batch size.")
-    parser.add_argument("--epochs", default=3, type=int, help="Number of epochs.")
+    parser.add_argument("--batch_size", default=64, type=int, help="Batch size.")
+    parser.add_argument("--epochs", default=15, type=int, help="Number of epochs.")
     parser.add_argument("--nasnet", default="nets/nasnet/model.ckpt", type=str, help="NASNet checkpoint path.")
-    parser.add_argument("--threads", default=8, type=int, help="Maximum number of threads to use.")
+    parser.add_argument("--threads", default=2, type=int, help="Maximum number of threads to use.")
     args = parser.parse_args()
 
     # Create logdir name
@@ -181,18 +184,18 @@ if __name__ == "__main__":
     # Train
     for i in range(args.epochs):
         print("Epoch", i)
+        total = 0
         while not train.epoch_finished():
             images, labels = train.next_batch(args.batch_size)
             network.train_batch(images, labels)
-            acc = network.evaluate("dev", dev, args.batch_size)
-            print(acc)
+            total += len(images)
+            print(total, "/", len(train.images))
 
-        acc = network.evaluate("dev", dev, args.batch_size)
-        print(acc)
+        accuracy = network.evaluate("dev", dev, args.batch_size)
+        print("Acc:", accuracy)
 
     # Predict test data
-    with open("{}/nsketch_transfer_test.txt".format(args.logdir), "w") as test_file:
+    with open("nsketch_transfer_test.txt", "w") as test_file:
         labels = network.predict(test, args.batch_size)
         for label in labels:
-            # print(label)
             print(label, file=test_file)
