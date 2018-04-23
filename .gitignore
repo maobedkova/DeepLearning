@@ -1,5 +1,6 @@
 */logs/*
 .idea/*
+__pycache__/*
 */gym_cartpole/*
 *.txt
 *.zip
