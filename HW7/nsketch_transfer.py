@@ -78,10 +78,10 @@ class Network:
 
             global_step = tf.train.create_global_step()
 
-            start_learn_rate = 0.00005
-            final_learn_rate = 0.0000005
+            start_learn_rate = 0.0001
+            final_learn_rate = 0.000001
             batches_per_epoch = len(train.labels) // args.batch_size
-            decay_rate = np.power(final_learn_rate / start_learn_rate, 1 / (args.epochs - 1))
+            decay_rate = np.power(final_learn_rate / start_learn_rate, 1 / 2)#args.epochs - 1))
             self.learning_rate = tf.train.exponential_decay(start_learn_rate,
                                                             global_step,
                                                             batches_per_epoch,
@@ -121,6 +121,8 @@ class Network:
             # Load NASNet
             self.nasnet_saver.restore(self.session, args.nasnet)
 
+            self.saver = tf.train.Saver(tf.global_variables(), max_to_keep=None)
+
     def train_batch(self, images, labels):
         self.session.run([self.training, self.summaries["train"]],
                          {self.images: images, self.labels: labels, self.is_training: True})
@@ -145,6 +147,12 @@ class Network:
             labels.append(self.session.run(self.predictions, {self.images: images, self.is_training: False}))
         return np.concatenate(labels)
 
+    def save(self, model):
+        self.saver.save(self.session, model)
+
+    def restore(self, model):
+        self.saver.restore(self.session, model)
+
 
 if __name__ == "__main__":
     import argparse
@@ -158,9 +166,12 @@ if __name__ == "__main__":
     # Parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch_size", default=64, type=int, help="Batch size.")
-    parser.add_argument("--epochs", default=15, type=int, help="Number of epochs.")
+    parser.add_argument("--epochs", default=1, type=int, help="Number of epochs.")
     parser.add_argument("--nasnet", default="nets/nasnet/model.ckpt", type=str, help="NASNet checkpoint path.")
-    parser.add_argument("--threads", default=2, type=int, help="Maximum number of threads to use.")
+    parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+    parser.add_argument("--mode", type=str, help="Mode (train, test)")
+    parser.add_argument("--epoch", type=int, help="Iteration of train data")
+    parser.add_argument("--start_batch", type=int, help="Checkpoint in batches")
     args = parser.parse_args()
 
     # Create logdir name
@@ -182,17 +193,39 @@ if __name__ == "__main__":
     network.construct(args)
 
     # Train
-    for i in range(args.epochs):
-        print("Epoch", i)
-        total = 0
-        while not train.epoch_finished():
-            images, labels = train.next_batch(args.batch_size)
-            network.train_batch(images, labels)
-            total += len(images)
-            print(total, "/", len(train.images))
+    if args.mode == "train":
+        if args.epoch != 1 and args.start_batch != 0:
+            network.restore("./models/model_{}e_{}b".format(args.epoch, args.start_batch))
+        for i in range(args.epochs):
+            count = 0
+            while not train.epoch_finished():
+                images, labels = train.next_batch(args.batch_size)
+                count += len(images)
+                if count <= args.start_batch and (args.epoch != 1 and args.start_batch != 0):
+                    continue
+                network.train_batch(images, labels)
+                print(count, "/", len(train.images))
+                if count % 100 == 0:
+                    network.save("./models/model_{}e_{}b".format(args.epoch, count))
+                    print("Model {}e {}b saved".format(args.epoch, count))
+                    break
+            accuracy = network.evaluate("dev", dev, args.batch_size)
+            print("Acc:", accuracy)
+    else:
+        network.restore("./models/model_{}e_{}b".format(args.epoch, args.start_batch))
 
-        accuracy = network.evaluate("dev", dev, args.batch_size)
-        print("Acc:", accuracy)
+
+    # for i in range(args.epochs):
+    #     print("Epoch", i)
+    #     total = 0
+    #     while not train.epoch_finished():
+    #         images, labels = train.next_batch(args.batch_size)
+    #         network.train_batch(images, labels)
+    #         total += len(images)
+    #         print(total, "/", len(train.images))
+    #
+    #     accuracy = network.evaluate("dev", dev, args.batch_size)
+    #     print("Acc:", accuracy)
 
     # Predict test data
     with open("nsketch_transfer_test.txt", "w") as test_file:
