@@ -35,3 +35,9 @@ Homework for Deep Learning class of Charles University.
 - **nsketch_transfer**: transfer learning
 - **sequence_classification**: RNN modeling, RNN, LSTM, GRU cells, exploding gradient, gradient clipping
 - **sequence_prediction**: low-level handling of RNN cells (dimensionality, type), mean squared error 
+
+### HW8
+
+- **tagger_we**: part-of-speech tagger, word embeddings, bidirectional RNN, resettable metrics
+- **tagger_cle**: part-of-speech tagger, character-level word embeddings, bidirectional character-level RNN, concatenating word-level embeddings and CLEs
+- **tagger_cnne**:
