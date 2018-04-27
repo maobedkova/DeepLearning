@@ -25,52 +25,78 @@ class Network:
             self.charseq_ids = tf.placeholder(tf.int32, [None, None], name="charseq_ids")
             self.tags = tf.placeholder(tf.int32, [None, None], name="tags")
 
-            # TODO(we): Choose RNN cell class according to args.rnn_cell (LSTM and GRU
+            # Choose RNN cell class according to args.rnn_cell (LSTM and GRU
             # should be supported, using tf.nn.rnn_cell.{BasicLSTM,GRU}Cell).
+            if args.rnn_cell == "LSTM":
+                rnn_cell_fwd = tf.nn.rnn_cell.BasicLSTMCell(num_units=args.rnn_cell_dim, name="lstm_cell")
+                rnn_cell_bwd = tf.nn.rnn_cell.BasicLSTMCell(num_units=args.rnn_cell_dim, name="lstm_cell")
+            elif args.rnn_cell == "GRU":
+                rnn_cell_fwd = tf.nn.rnn_cell.GRUCell(num_units=args.rnn_cell_dim, name="gru_cell")
+                rnn_cell_bwd = tf.nn.rnn_cell.GRUCell(num_units=args.rnn_cell_dim, name="gru_cell")
 
-            # TODO(we): Create word embeddings for num_words of dimensionality args.we_dim
+            # Create word embeddings for num_words of dimensionality args.we_dim
             # using `tf.get_variable`.
+            word_embeddings = tf.get_variable("word_embeddings", [num_words, args.we_dim])
 
-            # TODO(we): Embed self.word_ids according to the word embeddings, by utilizing
+            # Embed self.word_ids according to the word embeddings, by utilizing
             # `tf.nn.embedding_lookup`.
+            embedded_word_ids = tf.nn.embedding_lookup(word_embeddings, self.word_ids)
 
             # Convolutional word embeddings (CNNE)
 
-            # TODO: Generate character embeddings for num_chars of dimensionality args.cle_dim.
+            # Generate character embeddings for num_chars of dimensionality args.cle_dim.
+            character_embeddings = tf.get_variable("character_embeddings", [num_chars, args.cle_dim])
 
-            # TODO: Embed self.charseqs (list of unique words in the batch) using the character embeddings.
+            # Embed self.charseqs (list of unique words in the batch) using the character embeddings.
+            embedded_charseqs = tf.nn.embedding_lookup(character_embeddings, self.charseqs)
 
-            # TODO: For kernel sizes of {2..args.cnne_max}, do the following:
+            # For kernel sizes of {2..args.cnne_max}, do the following:
             # - use `tf.layers.conv1d` on input embedded characters, with given kernel size
             #   and `args.cnne_filters`; use `VALID` padding, stride 1 and no activation.
             # - perform channel-wise max-pooling over the whole word, generating output
             #   of size `args.cnne_filters` for every word.
+            feats = []
+            for kernel_size in range(2, args.cnne_max + 1):
+                hidden_layer = tf.layers.conv1d(embedded_charseqs, filters=args.cnne_filters,
+                                                kernel_size=kernel_size, strides=1, padding="valid")
+                feats.append(tf.layers.max_pooling1d(hidden_layer, 100, strides=1, padding="same")[:, 1, :])
 
-            # TODO: Concatenate the computed features (in the order of kernel sizes 2..args.cnne_max).
+            # Concatenate the computed features (in the order of kernel sizes 2..args.cnne_max).
             # Consequently, each word from `self.charseqs` is represented using convolutional embedding
             # (CNNE) of size `(args.cnne_max-1)*args.cnne_filters`.
+            concat_feats = tf.concat(feats, axis=1)
 
-            # TODO: Generate CNNEs of all words in the batch by indexing the just computed embeddings
+            # Generate CNNEs of all words in the batch by indexing the just computed embeddings
             # by self.charseq_ids (using tf.nn.embedding_lookup).
+            embedded_charseqs_ids = tf.nn.embedding_lookup(concat_feats, self.charseq_ids)
 
-            # TODO: Concatenate the word embeddings (computed above) and the CNNE (in this order).
+            # Concatenate the word embeddings (computed above) and the CNNE (in this order).
+            we_cnne = tf.concat([embedded_word_ids, embedded_charseqs_ids], axis=2)
 
-            # TODO(we): Using tf.nn.bidirectional_dynamic_rnn, process the embedded inputs.
+            # Using tf.nn.bidirectional_dynamic_rnn, process the embedded inputs.
             # Use given rnn_cell (different for fwd and bwd direction) and self.sentence_lens.
+            outputs, _ = tf.nn.bidirectional_dynamic_rnn(rnn_cell_fwd, rnn_cell_bwd, we_cnne,
+                                                         sequence_length=self.sentence_lens, dtype=tf.float32)
 
-            # TODO(we): Concatenate the outputs for fwd and bwd directions (in the third dimension).
+            # Concatenate the outputs for fwd and bwd directions (in the third dimension).
+            output = tf.concat(outputs, axis=2)
 
-            # TODO(we): Add a dense layer (without activation) into num_tags classes and
+            # Add a dense layer (without activation) into num_tags classes and
             # store result in `output_layer`.
+            output_layer = tf.layers.dense(output, units=num_tags, activation=None)
 
-            # TODO(we): Generate `self.predictions`.
+            # Generate `self.predictions`.
+            self.predictions = tf.argmax(output_layer, axis=2)
 
-            # TODO(we): Generate `weights` as a 1./0. mask of valid/invalid words (using `tf.sequence_mask`).
+            # Generate `weights` as a 1./0. mask of valid/invalid words (using `tf.sequence_mask`).
+            weights = tf.sequence_mask(self.sentence_lens, dtype=tf.float32)
 
             # Training
 
-            # TODO(we): Define `loss` using `tf.losses.sparse_softmax_cross_entropy`, but additionally
+            # Define `loss` using `tf.losses.sparse_softmax_cross_entropy`, but additionally
             # use `weights` parameter to mask-out invalid words.
+            loss = tf.losses.sparse_softmax_cross_entropy(self.tags, output_layer, weights)
+
             global_step = tf.train.create_global_step()
             self.training = tf.train.AdamOptimizer().minimize(loss, global_step=global_step, name="training")
 

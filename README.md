@@ -40,4 +40,4 @@ Homework for Deep Learning class of Charles University.
 
 - **tagger_we**: part-of-speech tagger, word embeddings, bidirectional RNN, resettable metrics
 - **tagger_cle**: part-of-speech tagger, character-level word embeddings, bidirectional character-level RNN, concatenating word-level embeddings and CLEs
-- **tagger_cnne**:
+- **tagger_cnne**: part-of-speech tagger, convolutional embeddings, concatenating word-level embeddings and CNNEs
