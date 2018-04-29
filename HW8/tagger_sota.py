@@ -86,7 +86,7 @@ class Network:
             for kernel_size in range(2, args.cnne_max + 1):
                 hidden_layer = tf.layers.conv1d(embedded_charseqs, filters=args.cnne_filters,
                                                 kernel_size=kernel_size, strides=1, padding="valid")
-                feats.append(tf.layers.max_pooling1d(hidden_layer, 100, strides=1, padding="same")[:, 1, :])
+                feats.append(tf.layers.max_pooling1d(hidden_layer, 500, strides=1, padding="same")[:, 1, :])
 
             # Concatenate the computed features (in the order of kernel sizes 2..args.cnne_max).
             # Consequently, each word from `self.charseqs` is represented using convolutional embedding
@@ -191,10 +191,10 @@ if __name__ == "__main__":
     # Parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch_size", default=50, type=int, help="Batch size.")
-    parser.add_argument("--epochs", default=10, type=int, help="Number of epochs.")
-    parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+    parser.add_argument("--epochs", default=5, type=int, help="Number of epochs.")
+    parser.add_argument("--threads", default=4, type=int, help="Maximum number of threads to use.")
     parser.add_argument("--cnne_filters", default=24, type=int, help="CNN embedding filters per length.")
-    parser.add_argument("--cnne_max", default=7, type=int, help="Maximum CNN filter length.")
+    parser.add_argument("--cnne_max", default=5, type=int, help="Maximum CNN filter length.")
     parser.add_argument("--cle_dim", default=32, type=int, help="Character-level embedding dimension.")
     parser.add_argument("--rnn_cell", default="GRU", type=str, help="RNN cell type.")
     parser.add_argument("--rnn_cell_dim", default=64, type=int, help="RNN cell dimension.")
