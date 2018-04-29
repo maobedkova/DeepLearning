@@ -52,12 +52,80 @@ class Network:
             self.charseq_ids = tf.placeholder(tf.int32, [None, None], name="charseq_ids")
             self.tags = tf.placeholder(tf.int32, [None, None], name="tags")
 
-            # TODO: Training.
-            # Define:
-            # - loss in `loss`
-            # - training in `self.training`
-            # - predictions in `self.predictions`
-            # - weights in `weights`
+            # Choose RNN cell class according to args.rnn_cell (LSTM and GRU
+            # should be supported, using tf.nn.rnn_cell.{BasicLSTM,GRU}Cell).
+            if args.rnn_cell == "LSTM":
+                rnn_cell_fwd = tf.nn.rnn_cell.BasicLSTMCell(num_units=args.rnn_cell_dim, name="lstm_cell")
+                rnn_cell_bwd = tf.nn.rnn_cell.BasicLSTMCell(num_units=args.rnn_cell_dim, name="lstm_cell")
+            elif args.rnn_cell == "GRU":
+                rnn_cell_fwd = tf.nn.rnn_cell.GRUCell(num_units=args.rnn_cell_dim, name="gru_cell")
+                rnn_cell_bwd = tf.nn.rnn_cell.GRUCell(num_units=args.rnn_cell_dim, name="gru_cell")
+
+            # Create word embeddings for num_words of dimensionality args.we_dim
+            # using `tf.get_variable`.
+            word_embeddings = tf.get_variable("word_embeddings", [num_words, args.we_dim])
+
+            # Embed self.word_ids according to the word embeddings, by utilizing
+            # `tf.nn.embedding_lookup`.
+            embedded_word_ids = tf.nn.embedding_lookup(word_embeddings, self.word_ids)
+
+            # Convolutional word embeddings (CNNE)
+
+            # Generate character embeddings for num_chars of dimensionality args.cle_dim.
+            character_embeddings = tf.get_variable("character_embeddings", [num_chars, args.cle_dim])
+
+            # Embed self.charseqs (list of unique words in the batch) using the character embeddings.
+            embedded_charseqs = tf.nn.embedding_lookup(character_embeddings, self.charseqs)
+
+            # For kernel sizes of {2..args.cnne_max}, do the following:
+            # - use `tf.layers.conv1d` on input embedded characters, with given kernel size
+            #   and `args.cnne_filters`; use `VALID` padding, stride 1 and no activation.
+            # - perform channel-wise max-pooling over the whole word, generating output
+            #   of size `args.cnne_filters` for every word.
+            feats = []
+            for kernel_size in range(2, args.cnne_max + 1):
+                hidden_layer = tf.layers.conv1d(embedded_charseqs, filters=args.cnne_filters,
+                                                kernel_size=kernel_size, strides=1, padding="valid")
+                feats.append(tf.layers.max_pooling1d(hidden_layer, 100, strides=1, padding="same")[:, 1, :])
+
+            # Concatenate the computed features (in the order of kernel sizes 2..args.cnne_max).
+            # Consequently, each word from `self.charseqs` is represented using convolutional embedding
+            # (CNNE) of size `(args.cnne_max-1)*args.cnne_filters`.
+            concat_feats = tf.concat(feats, axis=1)
+
+            # Generate CNNEs of all words in the batch by indexing the just computed embeddings
+            # by self.charseq_ids (using tf.nn.embedding_lookup).
+            embedded_charseqs_ids = tf.nn.embedding_lookup(concat_feats, self.charseq_ids)
+
+            # Concatenate the word embeddings (computed above) and the CNNE (in this order).
+            we_cnne = tf.concat([embedded_word_ids, embedded_charseqs_ids], axis=2)
+
+            # Using tf.nn.bidirectional_dynamic_rnn, process the embedded inputs.
+            # Use given rnn_cell (different for fwd and bwd direction) and self.sentence_lens.
+            outputs, _ = tf.nn.bidirectional_dynamic_rnn(rnn_cell_fwd, rnn_cell_bwd, we_cnne,
+                                                         sequence_length=self.sentence_lens, dtype=tf.float32)
+
+            # Concatenate the outputs for fwd and bwd directions (in the third dimension).
+            output = tf.concat(outputs, axis=2)
+
+            # Add a dense layer (without activation) into num_tags classes and
+            # store result in `output_layer`.
+            output_layer = tf.layers.dense(output, units=num_tags, activation=None)
+
+            # Generate `self.predictions`.
+            self.predictions = tf.argmax(output_layer, axis=2)
+
+            # Generate `weights` as a 1./0. mask of valid/invalid words (using `tf.sequence_mask`).
+            weights = tf.sequence_mask(self.sentence_lens, dtype=tf.float32)
+
+            # Training
+
+            # Define `loss` using `tf.losses.sparse_softmax_cross_entropy`, but additionally
+            # use `weights` parameter to mask-out invalid words.
+            loss = tf.losses.sparse_softmax_cross_entropy(self.tags, output_layer, weights)
+
+            global_step = tf.train.create_global_step()
+            self.training = tf.train.AdamOptimizer().minimize(loss, global_step=global_step, name="training")
 
             # Summaries
             self.current_accuracy, self.update_accuracy = tf.metrics.accuracy(self.tags, self.predictions, weights=weights)
@@ -122,9 +190,15 @@ if __name__ == "__main__":
 
     # Parse arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size", default=None, type=int, help="Batch size.")
-    parser.add_argument("--epochs", default=None, type=int, help="Number of epochs.")
+    parser.add_argument("--batch_size", default=50, type=int, help="Batch size.")
+    parser.add_argument("--epochs", default=10, type=int, help="Number of epochs.")
     parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+    parser.add_argument("--cnne_filters", default=24, type=int, help="CNN embedding filters per length.")
+    parser.add_argument("--cnne_max", default=7, type=int, help="Maximum CNN filter length.")
+    parser.add_argument("--cle_dim", default=32, type=int, help="Character-level embedding dimension.")
+    parser.add_argument("--rnn_cell", default="GRU", type=str, help="RNN cell type.")
+    parser.add_argument("--rnn_cell_dim", default=64, type=int, help="RNN cell dimension.")
+    parser.add_argument("--we_dim", default=64, type=int, help="Word embedding dimension.")
     args = parser.parse_args()
 
     # Create logdir name
@@ -140,8 +214,8 @@ if __name__ == "__main__":
     dev = morpho_dataset.MorphoDataset("czech-pdt-dev.txt", train=train, shuffle_batches=False)
     test = morpho_dataset.MorphoDataset("czech-pdt-test.txt", train=train, shuffle_batches=False)
 
-    analyzer_dictionary = MorphoAnalyzer("czech-pdt-analysis-dictionary.txt")
-    analyzer_guesser = MorphoAnalyzer("czech-pdt-analysis-guesser.txt")
+    # analyzer_dictionary = MorphoAnalyzer("czech-pdt-analysis-dictionary.txt")
+    # analyzer_guesser = MorphoAnalyzer("czech-pdt-analysis-guesser.txt")
 
     # Construct the network
     network = Network(threads=args.threads)
@@ -152,7 +226,8 @@ if __name__ == "__main__":
     for i in range(args.epochs):
         network.train_epoch(train, args.batch_size)
 
-        network.evaluate("dev", dev, args.batch_size)
+        acc = network.evaluate("dev", dev, args.batch_size)
+        print("{:.2f}".format(100 * acc))
 
     # Predict test data
     with open("{}/tagger_sota_test.txt".format(args.logdir), "w") as test_file:
