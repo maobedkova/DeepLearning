@@ -65,7 +65,7 @@ class Network:
 
             # Create a `decoder_layer` -- a fully connected layer with
             # target_chars neurons used in the decoder to classify into target characters.
-            decoder_layer = tf.layers.Dense(target_chars)
+            decoder_layer = tf.layers.Dense(units=target_chars, activation=None)
 
             # The DecoderTraining will be used during training. It will output logits for each
             # target character.
@@ -116,7 +116,7 @@ class Network:
                     outputs, states = rnn_decoder(inputs, states) # Run the decoder GRU cell using inputs and states.
                     outputs = decoder_layer(outputs) # Apply the decoder_layer on outputs.
                     # Use tf.argmax to choose most probable class (supply parameter `output_type=tf.int32`).
-                    outputs = tf.argmax(outputs, output_type=tf.int32)
+                    outputs = tf.argmax(outputs, axis=1, output_type=tf.int32)
                     # Embed `outputs` using target_embeddings
                     next_input = tf.nn.embedding_lookup(target_embeddings, outputs)
                     finished = tf.equal(outputs, eow) # True where outputs==eow, False otherwise

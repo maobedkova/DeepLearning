@@ -70,16 +70,16 @@ class Network:
 
             # Create a `decoder_layer` -- a fully connected layer with
             # target_chars neurons used in the decoder to classify into target characters.
-            decoder_layer = tf.layers.Dense(target_chars)
+            decoder_layer = tf.layers.Dense(units=target_chars, activation=None)
 
             # Attention
             # Generate three fully connected layers without activations:
             # - `source_layer` with args.rnn_dim units
             # - `state_layer` with args.rnn_dim units
             # - `weight_layer` with 1 unit
-            source_layer = tf.layers.Dense(args.rnn_dim)
-            state_layer = tf.layers.Dense(args.rnn_dim)
-            weight_layer = tf.layers.Dense(1)
+            source_layer = tf.layers.Dense(args.rnn_dim, activation=None)
+            state_layer = tf.layers.Dense(args.rnn_dim, activation=None)
+            weight_layer = tf.layers.Dense(1, activation=None)
 
             def with_attention(inputs, states):
                 # Generate the attention
@@ -155,7 +155,7 @@ class Network:
                     outputs, states = rnn_decoder(inputs, states)  # Run the decoder GRU cell using inputs and states.
                     outputs = decoder_layer(outputs)  # Apply the decoder_layer on outputs.
                     # Use tf.argmax to choose most probable class (supply parameter `output_type=tf.int32`).
-                    outputs = tf.argmax(outputs, output_type=tf.int32)
+                    outputs = tf.argmax(outputs, axis=1, output_type=tf.int32)
                     next_input = with_attention(tf.nn.embedding_lookup(target_embeddings, outputs), states) # Embed `outputs` using target_embeddings and pass it to with_attention.
                     finished = tf.equal(outputs, eow)  # True where outputs==eow, False otherwise
                     # Use tf.equal for the comparison, Python's '==' is not overloaded
