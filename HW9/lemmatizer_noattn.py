@@ -58,7 +58,7 @@ class Network:
             target_embeddings = tf.get_variable("target_embeddings", [target_chars, args.char_dim])
 
             # Embed the target_seqs using the target embeddings.
-            embedded_target_seqs = tf.nn.embedding_lookup(target_embeddings, self.target_seqs)
+            embedded_target_seqs = tf.nn.embedding_lookup(target_embeddings, target_seqs)
 
             # Generate a decoder GRU with dimension args.rnn_dim.
             rnn_decoder = tf.nn.rnn_cell.GRUCell(num_units=args.rnn_dim)
@@ -71,7 +71,7 @@ class Network:
             # target character.
             class DecoderTraining(tf.contrib.seq2seq.Decoder):
                 @property
-                def batch_size(self): return source_states.get_shape()[1] # Return size of the batch, using for example source_states size
+                def batch_size(self): return tf.shape(source_states)[0] # Return size of the batch, using for example source_states size
                 @property
                 def output_dtype(self): return tf.float32 # Type for logits of target characters
                 @property
@@ -88,8 +88,8 @@ class Network:
                 def step(self, time, inputs, states, name=None):
                     outputs, states = rnn_decoder(inputs, states) # Run the decoder GRU cell using inputs and states.
                     outputs = decoder_layer(outputs) # Apply the decoder_layer on outputs.
-                    next_input = embedded_target_seqs[time] # Next input are words with index `time` in target_embedded.
-                    finished = target_lens <= time + 1 # False if target_lens > time + 1, True otherwise.
+                    next_input = embedded_target_seqs[:, time] # Next input are words with index `time` in target_embedded.
+                    finished = tf.less_equal(target_lens, time + 1)  # False if target_lens > time + 1, True otherwise.
                     return outputs, states, next_input, finished
             output_layer, _, _ = tf.contrib.seq2seq.dynamic_decode(DecoderTraining())
             self.predictions_training = tf.argmax(output_layer, axis=2, output_type=tf.int32)
@@ -98,14 +98,14 @@ class Network:
             # directly output the predicted target characters.
             class DecoderPrediction(tf.contrib.seq2seq.Decoder):
                 @property
-                def batch_size(self): return source_states.get_shape()[1] # Return size of the batch, using for example source_states size
+                def batch_size(self): return tf.shape(source_states)[0] # Return size of the batch, using for example source_states size
                 @property
                 def output_dtype(self): return tf.int32 # Type for predicted target characters
                 @property
                 def output_size(self): return 1 # Will return just one output
 
                 def initialize(self, name=None):
-                    finished = [False] * self.batch_size # False of shape [self.batch_size].
+                    finished = tf.fill([self.batch_size], False) # False of shape [self.batch_size].
                     states = source_states # Initial decoder state to use.
                     inputs = tf.nn.embedding_lookup(target_embeddings, tf.fill([self.batch_size], bow))
                     # embedded BOW characters of shape [self.batch_size] using target embeddings.
