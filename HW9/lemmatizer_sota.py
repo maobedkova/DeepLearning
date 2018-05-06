@@ -307,10 +307,10 @@ if __name__ == "__main__":
 
     # Parse arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size", default=60, type=int, help="Batch size.")
-    parser.add_argument("--epochs", default=5, type=int, help="Number of epochs.")
-    parser.add_argument("--char_dim", default=128, type=int, help="Character embedding dimension.")
-    parser.add_argument("--rnn_dim", default=128, type=int, help="Dimension of the encoder and the decoder.")
+    parser.add_argument("--batch_size", default=10, type=int, help="Batch size.")
+    parser.add_argument("--epochs", default=10, type=int, help="Number of epochs.")
+    parser.add_argument("--char_dim", default=64, type=int, help="Character embedding dimension.")
+    parser.add_argument("--rnn_dim", default=64, type=int, help="Dimension of the encoder and the decoder.")
     parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
     args = parser.parse_args()
 
@@ -339,7 +339,8 @@ if __name__ == "__main__":
     for i in range(args.epochs):
         network.train_epoch(train, args.batch_size)
 
-        network.evaluate("dev", dev, args.batch_size)
+        acc = network.evaluate("dev", dev, args.batch_size)
+        print("{:.2f}".format(100 * acc))
 
     # Predict test data
     with open("{}/lemmatizer_sota_test.txt".format(args.logdir), "w", encoding="utf-8") as test_file:
