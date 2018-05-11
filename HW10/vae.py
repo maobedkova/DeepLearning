@@ -46,12 +46,12 @@ class Network:
             # `z_log_variance` / 2 to an exponential function.
             z_sd = tf.exp(z_log_variance / 2)
 
-            # Compute `epsilon` as a random normal noise, with a shape of `z_mean`.
-            epsilon = tf.random_uniform(tf.shape(z_mean), dtype=tf.float32)
+            # Compute `epsilon` as a random normal noise, with a shape of `z_mean`
+            epsilon = tf.random_normal(tf.shape(z_mean))
 
             # Compute `self.z` by drawing from normal distribution with
             # mean `z_mean` and standard deviation `z_sd` (utilizing the `epsilon` noise).
-            self.z = tf.add(z_mean, tf.multiply(z_sd, epsilon))
+            self.z = tf.add(z_mean, z_sd * epsilon)
 
             # Decoder
             def decoder(z):
@@ -61,17 +61,17 @@ class Network:
                 # - dense layer with as many neurons as there are pixels in an image
                 hidden_layer = tf.layers.dense(z, 500, activation=tf.nn.relu)
                 hidden_layer = tf.layers.dense(hidden_layer, 500, activation=tf.nn.relu)
-                hidden_layer = tf.layers.dense(hidden_layer, self.HEIGHT * self.WIDTH, activation=tf.nn.relu)
+                hidden_layer = tf.layers.dense(hidden_layer, self.HEIGHT * self.WIDTH)
 
                 # Consider the output of the last hidden layer to be the logits of
                 # individual pixels. Reshape them into a correct shape for a grayscale
                 # image of size self.WIDTH x self.HEIGHT and return them.
-                return tf.reshape(hidden_layer, tf.shape(self.images))
+                return tf.reshape(hidden_layer, [-1, self.WIDTH, self.HEIGHT, 1])
 
             generated_logits = decoder(self.z)
 
             # Define `self.generated_images` as generated_logits passed through a sigmoid.
-            self.generated_images = tf.sigmoid(generated_logits)
+            self.generated_images = tf.nn.sigmoid(generated_logits)
 
             # Loss and training
 
@@ -88,7 +88,7 @@ class Network:
             # Define `self.loss` as a weighted combination of
             # reconstruction_loss (weight is the number of pixels in an image)
             # and latent_loss (weight is the dimensionality of the latent variable z).
-            self.loss = reconstruction_loss * self.HEIGHT * self.WIDTH + latent_loss * tf.cast(self.z.get_shape()[1], dtype=tf.float32)
+            self.loss = reconstruction_loss * self.HEIGHT * self.WIDTH + latent_loss * self.z_dim
 
             global_step = tf.train.create_global_step()
             self.training = tf.train.AdamOptimizer().minimize(self.loss, global_step=global_step, name="training")
