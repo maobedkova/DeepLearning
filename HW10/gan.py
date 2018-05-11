@@ -54,7 +54,7 @@ class Network:
                 # Consider the last hidden layer output to be the logit of whether the input
                 # images comes from real data. Change its shape to remove the last dimension
                 # (i.e., [batch_size] instead of [batch_size, 1]) and return it.
-                return tf.reduce_max(hidden_layer, axis=1)
+                return tf.squeeze(hidden_layer)
 
             with tf.variable_scope("discriminator"):
                 # Define `discriminator_logit_real` as a result of
@@ -85,7 +85,7 @@ class Network:
             # Define `self.generator_loss` as a sigmoid cross entropy
             # loss with gold labels of ones (1.0) and discriminator_logit_fake.
             self.generator_loss = tf.losses.sigmoid_cross_entropy(
-                tf.zeros_like(tf.shape(discriminator_logit_fake)), discriminator_logit_fake)
+                tf.ones_like(tf.shape(discriminator_logit_fake)), discriminator_logit_fake)
 
             # Training
             global_step = tf.train.create_global_step()
@@ -100,7 +100,8 @@ class Network:
             # Create `self.generator_training` as an AdamOptimizer.minimize
             # for generator_loss and variables in "generator" namespace.
             # This time *do* pass global_step as argument to AdamOptimizer.minimize.
-            self.generator_training = tf.train.AdamOptimizer().minimize(self.discriminator_loss,
+            self.generator_training = tf.train.AdamOptimizer().minimize(self.generator_loss,
+                                                                        global_step=global_step,
                                                                         var_list=tf.global_variables(
                                                                             "generator"))
 
@@ -133,16 +134,16 @@ class Network:
         # self.discriminator_summary and self.discriminator_loss using
         # `images` as `self.images` and noise sampled with `self.sample_z` as `self.z`.
         _, _, disc_loss = self.session.run([self.discriminator_training, self.discriminator_summary, self.discriminator_loss],
-                                             {self.images: images, self.z: self.sample_z(len(images))})
+                                           {self.images: images, self.z: self.sample_z(len(images))})
 
         # In second self.session.run, evaluate self.generator_training,
         # self.generator_summary and self.generator_loss using
         # noise sampled with `self.sample_z` as `self.z`.
         _, _, gen_loss = self.session.run([self.generator_training, self.generator_summary, self.generator_loss],
-                                         {self.z: self.sample_z(len(images))})
+                                          {self.z: self.sample_z(len(images))})
 
         # Return the sum of evaluated self.discriminator_loss and self.generator_loss.
-        return gen_loss + disc_loss
+        return disc_loss + gen_loss
 
     def generate(self):
         GRID = 20
