@@ -25,16 +25,44 @@ class Network:
 
             # Generator
             def generator(z):
-                # TODO: Define a generator as a sequence of:
+                # Define a generator as a sequence of:
                 # - batch normalized dense layer with 1024 neurons and ReLU activation
+                hidden_layer = tf.layers.dense(z, 1024, activation=None, use_bias=False)
+                hidden_layer = tf.layers.batch_normalization(hidden_layer, training=True)
+                hidden_layer = tf.nn.relu(hidden_layer)
+
                 # - batch normalized dense layer with 7 * 7 * 64 neurons and ReLU activation
+                hidden_layer = tf.layers.dense(z, 7 * 7 * 64, activation=None, use_bias=False)
+                hidden_layer = tf.layers.batch_normalization(hidden_layer, training=True)
+                hidden_layer = tf.nn.relu(hidden_layer)
+
                 # - change shape to a batch of images with size 7 x 7 and 64 channels
+                hidden_layer = tf.reshape(hidden_layer, [7, 7, 64])
+
                 # - batch normalized conv2d_transpose with 32 output channels, kernel size 5,
                 #   stride 2, "same" padding and ReLU activation
+                hidden_layer = tf.layers.conv2d_transpose(hidden_layer,
+                                                          filters=32,
+                                                          kernel_size=5,
+                                                          strides=(2, 2),
+                                                          padding='same',
+                                                          activation=None,
+                                                          use_bias=False)
+                hidden_layer = tf.layers.batch_normalization(hidden_layer, training=True)
+                hidden_layer = tf.nn.relu(hidden_layer)
+
                 # - (non-normalized) conv2d_transpose with 1 output channel, kernel size 5,
                 #   stride 2, "same" padding and sigmoid activation
                 # Return the result.
-                #
+                hidden_layer = tf.layers.conv2d_transpose(hidden_layer,
+                                                          filters=1,
+                                                          kernel_size=5,
+                                                          strides=(2, 2),
+                                                          padding='same',
+                                                          activation=tf.nn.sigmoid,
+                                                          use_bias=False)
+                return hidden_layer
+
                 # Note that batch normalization should be used on inputs
                 # without bias (`use_bias=False`) and that activation should be
                 # applied after the batch normalization. Also use `training=True`
