@@ -32,12 +32,12 @@ class Network:
                 hidden_layer = tf.nn.relu(hidden_layer)
 
                 # - batch normalized dense layer with 7 * 7 * 64 neurons and ReLU activation
-                hidden_layer = tf.layers.dense(z, 7 * 7 * 64, activation=None, use_bias=False)
+                hidden_layer = tf.layers.dense(hidden_layer, 7 * 7 * 64, activation=None, use_bias=False)
                 hidden_layer = tf.layers.batch_normalization(hidden_layer, training=True)
                 hidden_layer = tf.nn.relu(hidden_layer)
 
                 # - change shape to a batch of images with size 7 x 7 and 64 channels
-                hidden_layer = tf.reshape(hidden_layer, [7, 7, 64])
+                hidden_layer = tf.reshape(hidden_layer, [-1, 7, 7, 64])
 
                 # - batch normalized conv2d_transpose with 32 output channels, kernel size 5,
                 #   stride 2, "same" padding and ReLU activation
@@ -60,7 +60,7 @@ class Network:
                                                           strides=(2, 2),
                                                           padding='same',
                                                           activation=tf.nn.sigmoid,
-                                                          use_bias=False)
+                                                          use_bias=True)
                 return hidden_layer
 
                 # Note that batch normalization should be used on inputs
@@ -70,57 +70,104 @@ class Network:
                 # in the batch normalization.
 
             with tf.variable_scope("generator"):
-                # TODO(GAN): Define `self.generated_images` as a result of `generator` applied to `self.z`.
+                # Define `self.generated_images` as a result of `generator` applied to `self.z`.
+                self.generated_images = generator(self.z)
 
             # Discriminator
             def discriminator(image):
-                # TODO: Define a discriminator as a sequence of:
+                # Define a discriminator as a sequence of:
                 # - batch normalized conv2d with 32 output channels, kernel size 5,
                 #   "same" padding and ReLU activation
+                hidden_layer = tf.layers.conv2d(image,
+                                                filters=32,
+                                                kernel_size=5,
+                                                padding='same',
+                                                activation=None,
+                                                use_bias=False)
+                hidden_layer = tf.layers.batch_normalization(hidden_layer, training=True)
+                hidden_layer = tf.nn.relu(hidden_layer)
+
                 # - max pooling layer with kernel size 2 and stride 2
+                hidden_layer = tf.layers.max_pooling2d(hidden_layer, pool_size=2, strides=2, padding="same")
+
                 # - batch normalized conv2d with 64 output channels, kernel size 5,
                 #   "same" padding and ReLU activation
+                hidden_layer = tf.layers.conv2d(hidden_layer,
+                                                filters=64,
+                                                kernel_size=5,
+                                                padding='same',
+                                                activation=None,
+                                                use_bias=False)
+                hidden_layer = tf.layers.batch_normalization(hidden_layer, training=True)
+                hidden_layer = tf.nn.relu(hidden_layer)
+
                 # - max pooling layer with kernel size 2 and stride 2
+                hidden_layer = tf.layers.max_pooling2d(hidden_layer, pool_size=2, strides=2, padding="same")
+
                 # - flattening layer
+                hidden_layer = tf.layers.flatten(hidden_layer)
+
                 # - batch normalized dense layer with 1024 neurons and ReLU activation
+                hidden_layer = tf.layers.dense(hidden_layer, 1024, activation=None, use_bias=False)
+                hidden_layer = tf.layers.batch_normalization(hidden_layer, training=True)
+                hidden_layer = tf.nn.relu(hidden_layer)
+
                 # - (non-normalized) dense layer with 1 neuron without activation.
-                #
+                hidden_layer = tf.layers.dense(hidden_layer, 1, activation=None)
+
                 # Consider the last hidden layer output to be the logit of whether the input
                 # images comes from real data. Change its shape to remove the last dimension
                 # (i.e., [batch_size] instead of [batch_size, 1]) and return it.
-                #
+                return tf.squeeze(hidden_layer)
+
                 # Same considerations as in `generator` regarding the batch normalization apply.
 
             with tf.variable_scope("discriminator"):
-                # TODO(GAN): Define `discriminator_logit_real` as a result of
+                # Define `discriminator_logit_real` as a result of
                 # `discriminator` applied to `self.images`.
+                discriminator_logit_real = discriminator(self.images)
 
             with tf.variable_scope("discriminator", reuse = True):
-                # TODO(GAN): Define `discriminator_logit_fake` as a result of
+                # Define `discriminator_logit_fake` as a result of
                 # `discriminator` applied to `self.generated_images`.
-                #
-                # TODO(GAN): Note the discriminator is called in the same variable
+                discriminator_logit_fake = discriminator(self.generated_images)
+
+                # Note the discriminator is called in the same variable
                 # scope as several lines above -- it will try to utilize the
                 # same variables. In order to allow reusing them, we need to explicitly
                 # pass the `reuse=True` flag.
 
             # Losses
-            # TODO(GAN): Define `self.discriminator_loss` as a sum of
+            # Define `self.discriminator_loss` as a sum of
             # - sigmoid cross entropy loss with gold labels of ones (1.0) and discriminator_logit_real
             # - sigmoid cross entropy loss with gold labels of zeros (0.0) and discriminator_logit_fake
+            real_loss = tf.losses.sigmoid_cross_entropy(tf.ones_like(tf.shape(discriminator_logit_real)),
+                                                        discriminator_logit_real)
+            fake_loss = tf.losses.sigmoid_cross_entropy(tf.zeros_like(tf.shape(discriminator_logit_fake)),
+                                                        discriminator_logit_fake)
+            self.discriminator_loss = real_loss + fake_loss
 
-            # TODO(GAN): Define `self.generator_loss` as a sigmoid cross entropy
+            # Define `self.generator_loss` as a sigmoid cross entropy
             # loss with gold labels of ones (1.0) and discriminator_logit_fake.
+            self.generator_loss = tf.losses.sigmoid_cross_entropy(
+                tf.ones_like(tf.shape(discriminator_logit_fake)), discriminator_logit_fake)
 
             # Training
             global_step = tf.train.create_global_step()
-            # TODO(GAN): Create `self.discriminator_training` as an AdamOptimizer.minimize
+            # Create `self.discriminator_training` as an AdamOptimizer.minimize
             # for discriminator_loss and variables in "discriminator" namespace.
             # Do *not* pass global_step as argument to AdamOptimizer.minimize.
+            self.discriminator_training = tf.train.AdamOptimizer().minimize(self.discriminator_loss,
+                                                                            var_list=tf.global_variables(
+                                                                                "discriminator"))
 
-            # TODO(GAN): Create `self.generator_training` as an AdamOptimizer.minimize
+            # Create `self.generator_training` as an AdamOptimizer.minimize
             # for generator_loss and variables in "generator" namespace.
             # This time *do* pass global_step as argument to AdamOptimizer.minimize.
+            self.generator_training = tf.train.AdamOptimizer().minimize(self.generator_loss,
+                                                                        global_step=global_step,
+                                                                        var_list=tf.global_variables(
+                                                                            "generator"))
 
             # Summaries
             discriminator_accuracy = tf.reduce_mean(tf.to_float(tf.concat([
@@ -142,19 +189,25 @@ class Network:
                 tf.contrib.summary.initialize(session=self.session, graph=self.session.graph)
 
     def sample_z(self, batch_size):
-        # TODO(GAN): Return uniform random noise in -1, 1 range using `np.random.uniform`
+        # Return uniform random noise in -1, 1 range using `np.random.uniform`
         # call, with shape [batch_size, self.z_dim].
+        return np.random.uniform(-1.0, 1.0, [batch_size, self.z_dim])
 
     def train(self, images):
-        # TODO(GAN): In first self.session.run, evaluate self.discriminator_training,
+        # In first self.session.run, evaluate self.discriminator_training,
         # self.discriminator_summary and self.discriminator_loss using
         # `images` as `self.images` and noise sampled with `self.sample_z` as `self.z`.
+        _, _, disc_loss = self.session.run([self.discriminator_training, self.discriminator_summary, self.discriminator_loss],
+                                           {self.images: images, self.z: self.sample_z(len(images))})
 
-        # TODO(GAN): In second self.session.run, evaluate self.generator_training,
+        # In second self.session.run, evaluate self.generator_training,
         # self.generator_summary and self.generator_loss using
         # noise sampled with `self.sample_z` as `self.z`.
+        _, _, gen_loss = self.session.run([self.generator_training, self.generator_summary, self.generator_loss],
+                                          {self.z: self.sample_z(len(images))})
 
-        # TODO(GAN): Return the sum of evaluated self.discriminator_loss and self.generator_loss.
+        # Return the sum of evaluated self.discriminator_loss and self.generator_loss.
+        return disc_loss + gen_loss
 
     def generate(self):
         GRID = 20
