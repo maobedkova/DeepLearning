@@ -41,3 +41,17 @@ Homework for Deep Learning class of Charles University.
 - **tagger_we**: part-of-speech tagger, word embeddings, bidirectional RNN, resettable metrics
 - **tagger_cle**: part-of-speech tagger, character-level word embeddings, bidirectional character-level RNN, concatenating word-level embeddings and CLEs
 - **tagger_cnne**: part-of-speech tagger, convolutional embeddings, concatenating word-level embeddings and CNNEs
+- **tagger_sota**: part-of-speech-tagger
+
+### HW9
+
+- **lemmatizer_noattn**: lemmatization, characters embedding, training time decoder, inference time decoder
+- **lemmatizer_attn**: lemmatization, bidirectional GRU encoder, attention for encoder
+- **lemmatizer_sota**: lemmatization
+
+### HW10
+
+- **vae**: simple Variational Autoencoder
+- **gan**: simple Generative Adversarion Network
+- **dcgan**: Deep Convolutional GAN
+- **nli**: Native Language Identification task on NLI Shared Task 2013 data
