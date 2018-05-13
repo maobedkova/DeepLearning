@@ -36,16 +36,16 @@ class Network:
             embedded_word_ids = tf.nn.embedding_lookup(word_embeddings, self.word_ids)
 
             feats = []
-            for kernel_size in range(2, 11):
+            for kernel_size in range(2, 16):
                 hidden_layer = tf.layers.conv1d(embedded_word_ids, filters=24,
                                                 kernel_size=kernel_size, strides=1, padding=\"valid\")
-                #hidden_layer = tf.layers.dropout(hidden_layer, rate=0.3, training=self.is_training, name=\"dropout\")
+              #  hidden_layer = tf.layers.dropout(hidden_layer, rate=0.3, training=self.is_training, name=\"dropout\")
                 feats.append(tf.layers.max_pooling1d(hidden_layer, 500, strides=1, padding=\"same\")[:, 1, :])
 
             concat_feats = tf.concat(feats, axis=-1)
 
             output_layer = tf.layers.dense(concat_feats, units=num_languages, activation=None)
-            #output_layer = tf.layers.dropout(output_layer, rate=0.3, training=self.is_training, name=\"dropout\")
+            # output_layer = tf.layers.dropout(output_layer, rate=0.3, training=self.is_training, name=\"dropout\")
 
             self.predictions = tf.argmax(output_layer, axis=-1)
 
@@ -160,7 +160,7 @@ if __name__ == \"__main__\":
             print(test.vocabulary(\"languages\")[language], file=test_file)
 """
 
-test_data = b'{Wp48S^xk9=GL@E0stWa761SMbT8$j;1Mqa30(js6b0I%KSMIrc?^VQfgIh^y!Mb=f%?=cFo{D=e{@<TlTqrT7fppXUU<Vdan@luTAWNtNX3*dPNZulb7KzFZ`;PjvO|BR*~Bsg0Lp!@ekHzMs5|-h<IV~WJp7wg-kE1}t~%*taDtcHp=1Rho)CP39tkQO73M2oRPj2T6Sx%J`-GSiE%Egv0s4@u8{`d{Q<T<D<~W-#INutjv8S<j)ulRx#!u(t8!(!_I{)?eakKjd6|1Jg595eC5>JwL+Zn=;-rs0|Pw&(MAZNjjiOIAJ<bAn@lk@IrXKY~Hcyo#o`Z@*An}zF)wk@;_qL1otBC3vtP6123MTIRU9^WFRZYYF9#A}*Pae{6iz5Iqk;M^s1t*!Ozq3_G+D-2ZJsP($$H**jn)?Fzc6?ChjO42lPH32_D>gZ54$A<8IR9Xx%dEu^rr}D9>Mf4nRie&8MysrIcP54*=263O;CllP%32aIl(R#n->)l7Iiv?CG7HB=tV>(k?tgj<uv^hQdfu3wqd0rjaf0yNh`lFhJ9+HU>V^p*@k`~`H5F{)A77r@7oPdvwG=&yF6Z-^lLrZJ5M6PPmp&AVwT#o^UO&+%Nef_(vkYq?!>|T)t)VxEPX(^9c78YqjX}Yo}G*fHEt}#UMZM#iwj>d)4ky)J&@pZCry65wjJb`xiEf40NG31nZtVv4?jbrdSMlp9$^2}i|oP_;Ntnl{;uSpg{G?&MUj3fMS-`Vg`s2g<dIW4;J>3z{#r0(N?kUk_8a9lD@AuiAp8!mmq(kMW6vu3*B{}n;5CP~#qM{_#IqUFYf5RGv>656M7*V4kpMJ~Xv1Mq(u?T?>-W71s7ciM(qWG|6J32F&G-vqA!eRF4~Z?vY>&7^^MT4|j4M9$P#JERUxm#R74je81DH7UD1eZUSyNT9Xm;hVMKE;ABLw0J7d3d&N#?FAx{VrXETbROT8a|NF`dbndGhuFTo_c{V{>%x1A9@W>o`EXs-FaIZ=00000T|X!ZEm~O!00E^2up$5eG<|;~vBYQl0ssI200dcD'
+test_data = b'{Wp48S^xk9=GL@E0stWa761SMbT8$j;1Mqa3S9st6b0I$g{*AAujET%e6x(40Q*l#upU(zDi08t#TfqFm=ruK2-MT}&zrU$uzNkHilaE9P&l#^azG&Ii~k=5L~+!{O_2@Cz4&H<;p-10H$%*kzMVcQFhJ5hr_N(mm1omE9n!B2F^k&qZSNejh89q$559VFFe;(X*bDgPq=b^JEPF8OmaTnj`L`CydpyO{t%h!LFP4wv!~l^GgXC|{fg)e@CffXg7~tsrs<U%BB(}aQUxr4k1`{s$eZrRnb}tQ>Dw}L=BKg;65r@U}YvqgOWuIRzKQ$@*2A`A4)I}G}KvDux28LkL(X26CJyUlb2VZN}4{MvrZII6`Zf4ZJaG$)IpUo5gOkeX-h9ItxLQ@5nQPEY{O^~(yGD-P^iv4yqEfSAUXIeR9xRkm4r<|K6ebAdA^DH)!9>|_AuaA{LP!@;#I0yv)KrK=WM>yM#y}Fd{EX1Smh()vQbv;xy*IE?20qAg?gjv?M{NDp64XhE)nzoSIm=#N)>0`~A9Z<j<99fRY%Luig`4kM8a>11i_i-nF<atvM9~7C)u9aUK8#T(~P+e^rmDvH@eM;vMKgP7*lkM?AwdyR;Ux!)79X4h<EcUjDiAu}{Q%2~2J(YwWK#}F!Ui7voA>ULD<=ds=pStNwhtbr#ln7dvAp+cUn7bI|kYJ)i50P&|IYXv#nWZnc^@B=fxFELIO<rE8H_L4&a(gBQknsA+KFo!OFv`FYCvdHm7=OxkXbmn^!ihzCZ+_fPiwg5&#OhqS)$+8;EGOd9h=Uugjro7+En6m8X<yShmh`2#fI?>4y|MAVfKl1DSuBvse6M}y-=sa+u4dIN`B;D4X!~zQL(u@aR+0U+H~5ns6@X}8IgX1ubNKQdRF5<(L)I+JrG=p*VD0QJdJHaNR@hptC*UWBpp(^WZKMP3U3_t5z~gnH(Cm&H-0;>qZ+JgMKj`hQ7aLgBByqW2(rzaK&D&~YQ!}1an1hqWJq%uRS&LHZ8~^|SAi4PMhzUy^00E{3up$5enh)!xvBYQl0ssI200dcD'
 
 if __name__ == "__main__":
     import base64

@@ -34,16 +34,16 @@ class Network:
             embedded_word_ids = tf.nn.embedding_lookup(word_embeddings, self.word_ids)
 
             feats = []
-            for kernel_size in range(2, 11):
+            for kernel_size in range(2, 16):
                 hidden_layer = tf.layers.conv1d(embedded_word_ids, filters=24,
                                                 kernel_size=kernel_size, strides=1, padding="valid")
-                #hidden_layer = tf.layers.dropout(hidden_layer, rate=0.3, training=self.is_training, name="dropout")
+              #  hidden_layer = tf.layers.dropout(hidden_layer, rate=0.3, training=self.is_training, name="dropout")
                 feats.append(tf.layers.max_pooling1d(hidden_layer, 500, strides=1, padding="same")[:, 1, :])
 
             concat_feats = tf.concat(feats, axis=-1)
 
             output_layer = tf.layers.dense(concat_feats, units=num_languages, activation=None)
-            #output_layer = tf.layers.dropout(output_layer, rate=0.3, training=self.is_training, name="dropout")
+            # output_layer = tf.layers.dropout(output_layer, rate=0.3, training=self.is_training, name="dropout")
 
             self.predictions = tf.argmax(output_layer, axis=-1)
 
