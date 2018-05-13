@@ -32,11 +32,11 @@ class Network:
             # - training in `self.training`
             # - predictions in `self.predictions`
 
-            word_embeddings = tf.get_variable(\"word_embeddings\", [num_words, 64])
+            word_embeddings = tf.get_variable(\"word_embeddings\", [num_words, 128])
             embedded_word_ids = tf.nn.embedding_lookup(word_embeddings, self.word_ids)
 
             feats = []
-            for kernel_size in range(2, 6):
+            for kernel_size in range(2, 11):
                 hidden_layer = tf.layers.conv1d(embedded_word_ids, filters=24,
                                                 kernel_size=kernel_size, strides=1, padding=\"valid\")
                 #hidden_layer = tf.layers.dropout(hidden_layer, rate=0.3, training=self.is_training, name=\"dropout\")
@@ -125,7 +125,7 @@ if __name__ == \"__main__\":
     # Parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument(\"--batch_size\", default=24, type=int, help=\"Batch size.\")
-    parser.add_argument(\"--epochs\", default=30, type=int, help=\"Number of epochs.\")
+    parser.add_argument(\"--epochs\", default=20, type=int, help=\"Number of epochs.\")
     parser.add_argument(\"--threads\", default=4, type=int, help=\"Maximum number of threads to use.\")
     args = parser.parse_args()
 
@@ -160,7 +160,7 @@ if __name__ == \"__main__\":
             print(test.vocabulary(\"languages\")[language], file=test_file)
 """
 
-test_data = b'{Wp48S^xk9=GL@E0stWa761SMbT8$j;1Mqa30(js6b0I$=s`D;+d<JLkLiWPQQLLoU)g8$$)#XY8g-7L%r{YuG%DP{SM}Zc-}cqh^lxr;_<~LyUQ^VaMj^$xgiIv1vKc&s<QNFldMLXG_(?~n7UYxBQ<5bC07P2WHlSxrFa>sv=PM$txic@Vy~ZJTx_Libl$P2eko9iXQ_??o(*KBdNn8Sngzl2dh3e2TtM=0{FRVkK-l(wji|m3+v*hf^lvSeN&cSi98^x;1!QIs&4f2Vw8GVf3c7pJXjK2Tj0{W6sD8JoO_AJ1N!P7_UPYg@fls8>qY#~<v*eDP?QHbc+{Ro1B3=>nYXBld^fY<psw9B>gFRK|#@&izct_-Jhy&<X8BLuF@dD2Ft0I{KAU=%8&b03QK5y47|1mJxRLbIh8E~M3{-6wZ-P<wM~#g*atXjm*+_(y&lONu~xZ@%c}e}*LFSm1tZHWYJuMZ{!X0=$IB=0O($+@%EE<6jcc#7&SOdMC-Nc%)YcNpP>R8CJ2tyETZ)flr#D*;tz(&Y?(H;7Mcecx3T<ZN~-@hFB>H1kVbtT>(atTQ+eRm%G^~n*PRZB)H<l7usLDz{LmX?rvG|2)(`FSLIl&981w(ZvCQc*j(D7K}Bxt$;VV9Ue6?&eJTpu=od<%%V%V)3L9|v(-q|KSb$9{isX0VnucalksJjx!Tr_0^nQB%kK>v7DLd>24Q(2HAgF2DSHDD_UWqaZ6=rj*Mk>_mGAsUwo)h2WCuiYswGAS#NSIrvUgp@8Yd$g8)|x+mQWHBwLMuy2nmGu#EU!`t`qr3A+uLUv#}fvHR#u2U|2Qm)wg=6mBOQRfB!LmWtC0wqq)IZrZygSt7HE~^cw7^S)eh5_j^O`<(T(eSLbiy-vRDzb;~cQoUX0$WaMQv=1eIqWlED*jo)rCBhhfM{Uhggq{3*J+@wv1t2NdGJi=E5QoUkmDs#YUL3cwp`+a*x{g)kp7qjq6Kw8-#IbxL)|8=T^7fxv6Fuz<QQ00000GkeOAxO=;|00E^2up$5eG<|;~vBYQl0ssI200dcD'
+test_data = b'{Wp48S^xk9=GL@E0stWa761SMbT8$j;1Mqa30(js6b0I%KSMIrc?^VQfgIh^y!Mb=f%?=cFo{D=e{@<TlTqrT7fppXUU<Vdan@luTAWNtNX3*dPNZulb7KzFZ`;PjvO|BR*~Bsg0Lp!@ekHzMs5|-h<IV~WJp7wg-kE1}t~%*taDtcHp=1Rho)CP39tkQO73M2oRPj2T6Sx%J`-GSiE%Egv0s4@u8{`d{Q<T<D<~W-#INutjv8S<j)ulRx#!u(t8!(!_I{)?eakKjd6|1Jg595eC5>JwL+Zn=;-rs0|Pw&(MAZNjjiOIAJ<bAn@lk@IrXKY~Hcyo#o`Z@*An}zF)wk@;_qL1otBC3vtP6123MTIRU9^WFRZYYF9#A}*Pae{6iz5Iqk;M^s1t*!Ozq3_G+D-2ZJsP($$H**jn)?Fzc6?ChjO42lPH32_D>gZ54$A<8IR9Xx%dEu^rr}D9>Mf4nRie&8MysrIcP54*=263O;CllP%32aIl(R#n->)l7Iiv?CG7HB=tV>(k?tgj<uv^hQdfu3wqd0rjaf0yNh`lFhJ9+HU>V^p*@k`~`H5F{)A77r@7oPdvwG=&yF6Z-^lLrZJ5M6PPmp&AVwT#o^UO&+%Nef_(vkYq?!>|T)t)VxEPX(^9c78YqjX}Yo}G*fHEt}#UMZM#iwj>d)4ky)J&@pZCry65wjJb`xiEf40NG31nZtVv4?jbrdSMlp9$^2}i|oP_;Ntnl{;uSpg{G?&MUj3fMS-`Vg`s2g<dIW4;J>3z{#r0(N?kUk_8a9lD@AuiAp8!mmq(kMW6vu3*B{}n;5CP~#qM{_#IqUFYf5RGv>656M7*V4kpMJ~Xv1Mq(u?T?>-W71s7ciM(qWG|6J32F&G-vqA!eRF4~Z?vY>&7^^MT4|j4M9$P#JERUxm#R74je81DH7UD1eZUSyNT9Xm;hVMKE;ABLw0J7d3d&N#?FAx{VrXETbROT8a|NF`dbndGhuFTo_c{V{>%x1A9@W>o`EXs-FaIZ=00000T|X!ZEm~O!00E^2up$5eG<|;~vBYQl0ssI200dcD'
 
 if __name__ == "__main__":
     import base64

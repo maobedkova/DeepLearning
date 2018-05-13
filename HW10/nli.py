@@ -30,11 +30,11 @@ class Network:
             # - training in `self.training`
             # - predictions in `self.predictions`
 
-            word_embeddings = tf.get_variable("word_embeddings", [num_words, 64])
+            word_embeddings = tf.get_variable("word_embeddings", [num_words, 128])
             embedded_word_ids = tf.nn.embedding_lookup(word_embeddings, self.word_ids)
 
             feats = []
-            for kernel_size in range(2, 6):
+            for kernel_size in range(2, 11):
                 hidden_layer = tf.layers.conv1d(embedded_word_ids, filters=24,
                                                 kernel_size=kernel_size, strides=1, padding="valid")
                 #hidden_layer = tf.layers.dropout(hidden_layer, rate=0.3, training=self.is_training, name="dropout")
@@ -123,7 +123,7 @@ if __name__ == "__main__":
     # Parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch_size", default=24, type=int, help="Batch size.")
-    parser.add_argument("--epochs", default=30, type=int, help="Number of epochs.")
+    parser.add_argument("--epochs", default=20, type=int, help="Number of epochs.")
     parser.add_argument("--threads", default=4, type=int, help="Maximum number of threads to use.")
     args = parser.parse_args()
 
