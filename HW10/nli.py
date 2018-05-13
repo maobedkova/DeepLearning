@@ -22,11 +22,34 @@ class Network:
             self.charseq_ids = tf.placeholder(tf.int32, [None, None], name="charseq_ids")
             self.languages = tf.placeholder(tf.int32, [None], name="languages")
 
-            # TODO: Training.
+            self.is_training = tf.placeholder(tf.bool, [], name="is_training")
+
+            # Training.
             # Define:
             # - loss in `loss`
             # - training in `self.training`
             # - predictions in `self.predictions`
+
+            word_embeddings = tf.get_variable("word_embeddings", [num_words, 64])
+            embedded_word_ids = tf.nn.embedding_lookup(word_embeddings, self.word_ids)
+
+            feats = []
+            for kernel_size in range(2, 6):
+                hidden_layer = tf.layers.conv1d(embedded_word_ids, filters=24,
+                                                kernel_size=kernel_size, strides=1, padding="valid")
+                hidden_layer = tf.layers.dropout(hidden_layer, rate=0.3, training=self.is_training, name="dropout")
+                feats.append(tf.layers.max_pooling1d(hidden_layer, 500, strides=1, padding="same")[:, 1, :])
+
+            concat_feats = tf.concat(feats, axis=-1)
+
+            hidden_layer = tf.layers.dense(concat_feats, units=num_languages, activation=None)
+            output_layer = tf.layers.dropout(hidden_layer, rate=0.3, training=self.is_training, name="dropout")
+
+            self.predictions = tf.argmax(output_layer, axis=-1)
+
+            loss = tf.losses.sparse_softmax_cross_entropy(self.languages, output_layer)
+            global_step = tf.train.create_global_step()
+            self.training = tf.train.AdamOptimizer(0.00001).minimize(loss, global_step=global_step, name="training")
 
             # Summaries
             self.current_accuracy, self.update_accuracy = tf.metrics.accuracy(self.languages, self.predictions)
@@ -57,7 +80,8 @@ class Network:
                              {self.sentence_lens: sentence_lens,
                               self.charseqs: charseqs, self.charseq_lens: charseq_lens,
                               self.word_ids: word_ids, self.charseq_ids: charseq_ids,
-                              self.languages: languages})
+                              self.languages: languages,
+                              self.is_training: True})
 
     def evaluate(self, dataset_name, dataset, batch_size):
         self.session.run(self.reset_metrics)
@@ -68,7 +92,8 @@ class Network:
                              {self.sentence_lens: sentence_lens,
                               self.charseqs: charseqs, self.charseq_lens: charseq_lens,
                               self.word_ids: word_ids, self.charseq_ids: charseq_ids,
-                              self.languages: languages})
+                              self.languages: languages,
+                              self.is_training: False})
 
         return self.session.run([self.current_accuracy, self.summaries[dataset_name]])[0]
 
@@ -96,8 +121,8 @@ if __name__ == "__main__":
 
     # Parse arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size", default=None, type=int, help="Batch size.")
-    parser.add_argument("--epochs", default=None, type=int, help="Number of epochs.")
+    parser.add_argument("--batch_size", default=64, type=int, help="Batch size.")
+    parser.add_argument("--epochs", default=100, type=int, help="Number of epochs.")
     parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
     args = parser.parse_args()
 
@@ -122,7 +147,8 @@ if __name__ == "__main__":
     for i in range(args.epochs):
         network.train_epoch(train, args.batch_size)
 
-        network.evaluate("dev", dev, args.batch_size)
+        acc = network.evaluate("dev", dev, args.batch_size)
+        print("{:.2f}".format(100 * acc))
 
     # Predict test data
     with open("{}/nli_test.txt".format(args.logdir), "w", encoding="utf-8") as test_file:
