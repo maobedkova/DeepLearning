@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import numpy as np
 import cart_pole_evaluator
-from collections import defaultdict
 
 
 if __name__ == "__main__":
@@ -15,59 +14,63 @@ if __name__ == "__main__":
     parser.add_argument("--render_each", default=0, type=int, help="Render some episodes.")
 
     parser.add_argument("--epsilon", default=0.1, type=float, help="Exploration factor.")
-    parser.add_argument("--epsilon_final", default=None, type=float, help="Final exploration factor.")
+    parser.add_argument("--epsilon_final", default=0.005, type=float, help="Final exploration factor.")
     parser.add_argument("--gamma", default=1.0, type=float, help="Discounting factor.")
     args = parser.parse_args()
 
     # Create the environment
     env = cart_pole_evaluator.environment()
 
-    print("states", env.states)
-    print("actions", env.actions)
-
     # Implement Monte-Carlo RL algorithm.
 
-    sums = defaultdict(float)
-    counts = defaultdict(float)
+    policy = np.full((env.states, env.actions), 1 / env.actions)
+    Q = np.zeros((env.states, env.actions), dtype=float)
+    A = np.zeros((env.states, env.actions), dtype=int)
 
-    Q = defaultdict(lambda: np.zeros(env.actions))
-    num_episodes = 12000
-    discount_factor = 1.0
-    epsilon = 0.1
-
-    # Policy function
-    def policy(observation):
-        A = np.ones(env.actions) * epsilon / env.actions
-        best_action = np.argmax(Q[observation])
-        A[best_action] += (1.0 - epsilon)
-        return A
-
-    # Train + Evaluate
-    for i_episode in range(1, num_episodes + 1):
+    # Training
+    training = True
+    rewards = []
+    while training:
+        # Generate episode
         episode = []
-        state_actions = []
-        if num_episodes - 100 > i_episode:
-            state, done = env.reset(), False
-        else:
-            state = env.reset(start_evaluate=True)
-        for t in range(100):
+        sum_reward = 0
+        state, done = env.reset(), False
+        while not done:
             if args.render_each and env.episode and env.episode % args.render_each == 0:
                 env.render()
-            probs = policy(state)
-            action = np.random.choice(np.arange(len(probs)), p=probs)
+            action = np.random.choice(env.actions, replace=False, p=policy[state, :])
             next_state, reward, done, _ = env.step(action)
             episode.append((state, action, reward))
-            state_actions.append((state, action))
-            if done:
-                break
             state = next_state
+            sum_reward += reward
 
-        # Update Q
-        for state_action in set(state_actions):
-            first_state_action = next(i for i, rest in enumerate(episode)
-                                       if rest[0] == state_action[0] and rest[1] == state_action[1])
-            G = sum([rest[2] * (discount_factor ** i) for i, rest in enumerate(episode[first_state_action:])])
-            sums[state_action] += G
-            counts[state_action] += 1.0
-            Q[state_action[0]][state_action[1]] = sums[state_action] / counts[state_action]
+        # Condition for finishing the training
+        rewards.append(sum_reward)
+        epsilon = args.epsilon - (np.mean(rewards[-400:]) / 500.0) * (args.epsilon - args.epsilon_final)
+        # epsilon = args.epsilon
 
+        # print(np.mean(rewards[-400:]))
+        if np.mean(rewards[-400:]) > 475.0:
+            training = False
+
+        # Update policy
+        G = 0
+        for (state, action, reward) in reversed(episode):
+            G += reward
+            avg = A[state, action]
+            A[state, action] += 1
+            Q[state, action] = ((Q[state, action] * avg) + G) / (avg + 1)
+            best = np.argmax(Q[state, :])
+            for action_id in range(env.actions):
+                if action_id == best:
+                    policy[state, action_id] = 1 - epsilon + (epsilon / env.actions)
+                else:
+                    policy[state, action_id] = epsilon / env.actions
+
+    # Perform last 100 evaluation episodes
+    for i in range(100):
+        state, done = env.reset(start_evaluate=True), False
+        while not done:
+            action = np.random.choice(env.actions, replace=False, p=policy[state, :])
+            next_state, reward, done, _ = env.step(action)
+            state = next_state
