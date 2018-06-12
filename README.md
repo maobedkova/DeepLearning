@@ -55,3 +55,13 @@ Homework for Deep Learning class of Charles University.
 - **gan**: simple Generative Adversarion Network
 - **dcgan**: Deep Convolutional GAN
 - **nli**: Native Language Identification task on NLI Shared Task 2013 data
+
+### HW11
+
+- **tagger_crf**: tagger, bidiretional RNN, Conditional Random Fields layer
+- **monte_carlo**: reinforcement learning using Monte Carlo algorithm
+
+### HW12
+
+- **eager-mnist**: mnist dataset, CNN using tensorflow.contrib.eager package
+- **estimator-mnist**: mnist dataset, CNN using tensorflow.estimator package
